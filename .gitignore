@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data and generated outputs
+mapping_store.json
+exceptions.json
+processing_log.json
+ai_usage.json
+validation_rules.json
+*.log
+
+demo-data/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+build/
+dist/
+coverage/
+htmlcov/
+
+# Misc
+*.sqlite3
+*.bak
+*.tmp

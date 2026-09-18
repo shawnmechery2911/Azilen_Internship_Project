@@ -1,0 +1,20 @@
+[
+  "Version",
+  "MethodName",
+  "Applicant.Names[0].Type",
+  "Request.BackgroundOrder.AddToSamba",
+  "Sender.Id",
+  "TransactInfo.TransactId",
+  "AccountNumber",
+  "Request.BackgroundOrder.BackgroundPackageName",
+  "FCRAPermissibleType",
+  "Applicant.ApplicantId",
+  "Applicant.PartnerReference1",
+  "Applicant.Names[0].GivenName",
+  "Applicant.Names[0].MiddleName",
+  "Applicant.Names[0].FamilyName",
+  "Applicant.Names[0].Suffix",
+  "Applicant.Email",
+  "Applicant.PhoneNumber",
+  "Applicant.SSN"
+]

@@ -1,0 +1,20 @@
+[
+  {"source": "Static:1.0", "destination": "Version", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Static:DirectInvitation", "destination": "MethodName", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Static:MAIN", "destination": "Applicant.Names[0].Type", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Static:false", "destination": "Request.BackgroundOrder.AddToSamba", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Username", "destination": "Sender.Id", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Person.PartnerReference", "destination": "TransactInfo.TransactId", "required": false, "transform": null, "source_is_list": false},
+  {"source": "AccountNumber", "destination": "AccountNumber", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Package", "destination": "Request.BackgroundOrder.BackgroundPackageName", "required": false, "transform": null, "source_is_list": false},
+  {"source": "FCRAPurpose", "destination": "FCRAPermissibleType", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Person.ApplicantID", "destination": "Applicant.ApplicantId", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Person.PartnerReference", "destination": "Applicant.PartnerReference1", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Person.FirstName", "destination": "Applicant.Names[0].GivenName", "required": true, "transform": null, "source_is_list": false},
+  {"source": "Person.MiddleName", "destination": "Applicant.Names[0].MiddleName", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Person.LastName", "destination": "Applicant.Names[0].FamilyName", "required": true, "transform": null, "source_is_list": false},
+  {"source": "Person.Suffix", "destination": "Applicant.Names[0].Suffix", "required": false, "transform": null, "source_is_list": false},
+  {"source": "Person.Email", "destination": "Applicant.Email", "required": true, "transform": null, "source_is_list": false},
+  {"source": "Person.Phone", "destination": "Applicant.PhoneNumber", "required": false, "transform": "phone", "source_is_list": false},
+  {"source": "Person.SSN", "destination": "Applicant.SSN", "required": true, "transform": "digits_only", "source_is_list": false}
+]
