@@ -1331,14 +1331,6 @@ button.row:hover .row-action {
     background: var(--surface-2);
   }
 }
-.break-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-  font-size: var(--fs-meta);
-  white-space: nowrap;
-}
 .process-controls select {
   flex: 0 1 190px;
 }

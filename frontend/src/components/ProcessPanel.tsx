@@ -14,24 +14,70 @@ import { ErrorPanel } from "./ScreenState";
 import { IssueList } from "./IssueList";
 import { PayloadView } from "./PayloadView";
 
-/** Drop a field the mapping depends on, so the order fails. Reaching drift
- *  means failing the same field repeatedly, and hand-editing JSON between
- *  runs is not something to do in front of an audience. */
-function damage(payload: Record<string, unknown>): Record<string, unknown> {
-  const copy: Record<string, unknown> = JSON.parse(JSON.stringify(payload));
-  for (const value of Object.values(copy)) {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const inner = value as Record<string, unknown>;
-      const victim = Object.keys(inner).find((key) => /name|email|id/i.test(key));
-      if (victim) {
-        delete inner[victim];
-        return copy;
-      }
-    }
+/** What a partner plausibly renames a field to. A believable rename matters:
+ *  the point is to show drift spotting a real change, not a scrambled key. */
+const RENAMES: [RegExp, string][] = [
+  [/ApplicantID$/i, "CandidateID"],
+  [/CandidateID$/i, "ApplicantRef"],
+  [/^Email$/i, "EmailAddress"],
+  [/FirstName$/i, "GivenName"],
+  [/LastName$/i, "Surname"],
+  [/ID$/i, "Ref"],
+  [/^Username$/i, "UserLogin"],
+  [/^AccountNumber$/i, "AccountNo"],
+  [/^Package$/i, "PackageName"],
+];
+
+function renamedKey(key: string): string {
+  for (const [pattern, replacement] of RENAMES) {
+    if (pattern.test(key)) return key.replace(pattern, replacement);
   }
-  const top = Object.keys(copy).find((key) => /account|package|name/i.test(key));
-  if (top) delete copy[top];
-  return copy;
+  return `${key}Value`;
+}
+
+function readPath(payload: Record<string, unknown>, path: string): unknown {
+  return path
+    .split(".")
+    .reduce<unknown>(
+      (node, part) =>
+        node && typeof node === "object"
+          ? (node as Record<string, unknown>)[part]
+          : undefined,
+      payload,
+    );
+}
+
+/** Change the payload the way a partner would, on a path the mapping reads -
+ *  otherwise nothing downstream notices and the demo shows nothing. */
+function alter(
+  payload: Record<string, unknown>,
+  sources: { source: string; required: boolean }[],
+  how: "drop" | "rename",
+): { data: Record<string, unknown>; field: string } {
+  const copy: Record<string, unknown> = JSON.parse(JSON.stringify(payload));
+  const usable = sources.filter(
+    (row) =>
+      !row.source.startsWith("Static:") &&
+      readPath(copy, row.source) !== undefined,
+  );
+  // a required field first: changing one the mapping does not depend on
+  // proves drift fires on a clean order, but it is the weaker story
+  const target = (usable.find((row) => row.required) ?? usable[0])?.source;
+  if (!target) return { data: copy, field: "" };
+
+  const parts = target.split(".");
+  const key = parts.pop() as string;
+  const parent = parts.reduce<Record<string, unknown>>(
+    (node, part) => node[part] as Record<string, unknown>,
+    copy,
+  );
+  if (how === "drop") {
+    delete parent[key];
+    return { data: copy, field: target };
+  }
+  parent[renamedKey(key)] = parent[key];
+  delete parent[key];
+  return { data: copy, field: `${target} -> ${renamedKey(key)}` };
 }
 
 export function ProcessPanel({
@@ -43,7 +89,10 @@ export function ProcessPanel({
   const [ats, setAts] = useState("");
   const [samples, setSamples] = useState<PartnerSample[]>([]);
   const [chosen, setChosen] = useState("");
-  const [breakIt, setBreakIt] = useState(false);
+  const [how, setHow] = useState<"as-is" | "drop" | "rename">("as-is");
+  const [sources, setSources] = useState<
+    { source: string; required: boolean }[]
+  >([]);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,7 +119,20 @@ export function ProcessPanel({
         setChosen(found[0]?.label ?? "");
       })
       .catch(() => setSamples([]));
-  }, [ats]);
+    const partnerType = partners.find((item) => item.ats === ats)?.payload_type;
+    if (partnerType) {
+      void getMapping(ats, partnerType)
+        .then((m) =>
+          setSources(
+            m.mappings.map((row) => ({
+              source: row.source,
+              required: row.required,
+            })),
+          ),
+        )
+        .catch(() => setSources([]));
+    }
+  }, [ats, partners]);
 
   const partner = useMemo(
     () => partners.find((item) => item.ats === ats),
@@ -87,7 +149,8 @@ export function ProcessPanel({
         await runProcess({
           ats: partner.ats,
           payload_type: partner.payload_type,
-          data: breakIt ? damage(sample.data) : sample.data,
+          data:
+            how === "as-is" ? sample.data : alter(sample.data, sources, how).data,
         }),
       );
     } catch (err) {
@@ -127,7 +190,7 @@ export function ProcessPanel({
       const draft = await draftMapping(
         partner.ats,
         partner.payload_type,
-        breakIt ? damage(sample.data) : sample.data,
+        how === "as-is" ? sample.data : alter(sample.data, sources, how).data,
         current.mappings.map((item) => item.destination),
       );
       onReview(partner.ats, partner.payload_type, draft.version);
@@ -193,14 +256,20 @@ export function ProcessPanel({
               )}
             </select>
 
-            <label className="break-toggle">
-              <input
-                type="checkbox"
-                checked={breakIt}
-                onChange={(event) => setBreakIt(event.target.checked)}
-              />
-              drop a field
+            <label className="sr-only" htmlFor="test-how">
+              How to send it
             </label>
+            <select
+              id="test-how"
+              value={how}
+              onChange={(event) =>
+                setHow(event.target.value as "as-is" | "drop" | "rename")
+              }
+            >
+              <option value="as-is">send as-is</option>
+              <option value="drop">drop a field</option>
+              <option value="rename">rename a field</option>
+            </select>
 
             <button
               className="primary-button"
