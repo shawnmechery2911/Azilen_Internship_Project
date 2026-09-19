@@ -9,7 +9,14 @@ import {
   type MappingVersion,
   type ReplayResult,
 } from "../api";
-import { ErrorPanel, Loading } from "../components/ScreenState";
+import { EmptyState, ErrorPanel, Loading } from "../components/ScreenState";
+
+/** Static:1.0 is storage syntax; a reviewer should see a constant. */
+function describeSource(source: string): { text: string; constant: boolean } {
+  return source.startsWith("Static:")
+    ? { text: source.slice("Static:".length), constant: true }
+    : { text: source, constant: false };
+}
 
 /** Pull an example value out of a stored payload so a rule reads concretely. */
 function valueAt(data: unknown, path: string): string | null {
@@ -170,40 +177,66 @@ export function MappingReviewScreen({
           <span>the model declined to guess</span>
         </div>
         <div>
+          <strong>
+            {Math.max(
+              0,
+              destinations.length -
+                mapping.mappings.length -
+                mapping.abstentions.length,
+            )}
+          </strong>
+          <span>not covered either way</span>
+        </div>
+        <div>
           <strong>{checked}</strong>
           <span>stored orders replayed</span>
         </div>
       </section>
 
-      <div className="content-grid">
-        <div className="panel">
-          <h2>Field mappings</h2>
+      <section className="panel">
+        <h2>Field mappings</h2>
+        <div className="map-table">
+          <div className="map-head">
+            <span>{ats} sends</span>
+            <span />
+            <span>we store it as</span>
+            <span>example</span>
+          </div>
           {mapping.mappings.map((rule, index) => {
             const example = sample ? valueAt(sample, rule.source) : null;
+            const source = describeSource(rule.source);
             const notes = [
               rule.transform ? `transform: ${rule.transform}` : null,
               rule.source_is_list ? "list" : null,
               rule.required ? "required" : null,
             ].filter(Boolean);
             return (
-              <div className="map-row" key={`${rule.destination}-${index}`}>
-                <div className="map-line">
-                  <code className="map-dest">{rule.destination}</code>
-                  <span className="map-arrow">←</span>
-                  <code className="map-src">{rule.source}</code>
-                </div>
-                {example !== null && (
-                  <span className="map-sample">e.g. {example}</span>
-                )}
-                {rule.reason && <span className="map-reason">{rule.reason}</span>}
-                {notes.length > 0 && (
-                  <span className="map-notes">{notes.join(" · ")}</span>
+              <div className="map-line" key={`${rule.destination}-${index}`}>
+                <span className="map-src">
+                  <code>{source.text}</code>
+                  {source.constant && <em className="map-const">constant</em>}
+                </span>
+                <span className="map-arrow" aria-hidden="true">
+                  →
+                </span>
+                <code className="map-dest">{rule.destination}</code>
+                <span className="map-sample">
+                  {source.constant ? "" : (example ?? "—")}
+                </span>
+                {(rule.reason || notes.length > 0) && (
+                  <span className="map-note">
+                    {rule.reason}
+                    {rule.reason && notes.length > 0 ? " · " : ""}
+                    {notes.join(" · ")}
+                  </span>
                 )}
               </div>
             );
           })}
         </div>
+      </section>
 
+      <div className="content-grid">
         <div className="panel">
           <h2>Not mapped</h2>
           {mapping.abstentions.length ? (
@@ -214,16 +247,16 @@ export function MappingReviewScreen({
               </div>
             ))
           ) : (
-            <p className="map-empty">
-              The model mapped every destination field it was given.
-            </p>
+            <EmptyState label="The model mapped every destination field it was given." />
           )}
+        </div>
 
-          <h2 className="panel-subhead">Replay detail</h2>
+        <div className="panel">
+          <h2>Replay detail</h2>
           {checked ? (
             replay?.results.map((result) => (
               <div className="map-row" key={result.payload}>
-                <div className="map-line">
+                <div className="map-line-plain">
                   <code className="map-dest">{result.payload}</code>
                   <span
                     className={`status ${result.status === "processed" ? "status-processed" : "status-exception"}`}
@@ -239,7 +272,7 @@ export function MappingReviewScreen({
               </div>
             ))
           ) : (
-            <p className="map-empty">No stored orders for this partner yet.</p>
+            <EmptyState label="No stored orders for this partner yet." />
           )}
         </div>
       </div>

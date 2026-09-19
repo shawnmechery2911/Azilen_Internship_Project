@@ -662,36 +662,9 @@ button.mapping-list-row:hover {
 .map-row:first-of-type {
   border-top: 0;
 }
-.map-line {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-}
-.map-dest {
-  font-family: var(--mono);
-  font-size: var(--fs-meta);
-  color: var(--text);
-}
-.map-arrow {
-  color: var(--muted-3);
-}
-.map-src {
-  font-family: var(--mono);
-  font-size: var(--fs-meta);
-  color: var(--code);
-}
-.map-sample {
-  font-size: var(--fs-meta);
-  color: var(--muted);
-}
 .map-reason {
   font-size: var(--fs-meta);
   color: var(--muted-2);
-}
-.map-notes {
-  font-size: var(--fs-label);
-  color: var(--muted-3);
 }
 .map-empty {
   margin: 0;
@@ -1017,4 +990,82 @@ button.row:hover .row-action {
 }
 .back-link:hover {
   color: var(--accent-hover);
+}
+
+/* --- the mapping table ------------------------------------------------------
+   Source on the left, destination on the right, arrow in a fixed gutter, so
+   both sides can be scanned as columns. Written dest-first with a left arrow,
+   it asked the reader to work right to left.
+   --------------------------------------------------------------------------- */
+.map-table {
+  display: flex;
+  flex-direction: column;
+}
+.map-head,
+.map-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1.15fr) 190px;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 0;
+}
+.map-head {
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-3);
+  font-size: var(--fs-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+.map-line {
+  border-top: 1px solid var(--border-soft);
+}
+.map-line:first-of-type {
+  border-top: 0;
+}
+.map-src code,
+.map-dest {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  word-break: break-all;
+}
+/* their side reads as input, ours as the thing being produced */
+.map-src code {
+  color: var(--code);
+}
+.map-dest {
+  color: var(--text);
+  font-weight: 500;
+}
+.map-const {
+  margin-left: 7px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--muted-2);
+  font-style: normal;
+  font-size: var(--fs-label);
+  font-weight: 600;
+}
+.map-arrow {
+  color: var(--muted-3);
+  text-align: center;
+}
+.map-sample {
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  word-break: break-word;
+}
+.map-note {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  color: var(--muted-3);
+  font-size: var(--fs-label);
+}
+.map-line-plain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
