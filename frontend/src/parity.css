@@ -1171,6 +1171,7 @@ button.row:hover .row-action {
   gap: 8px;
   flex-wrap: wrap;
 }
+.map-edit select,
 .map-edit input {
   width: 230px;
   padding: 6px 9px;

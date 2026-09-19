@@ -134,6 +134,16 @@ def partner_source_fields(ats: str):
         for path in leaf_paths(payload):
             if path not in seen:
                 seen.append(path)
+    # Paths already used by this partner's mappings, so the list is useful even
+    # for a draft made before payloads were being kept - at minimum a reviewer
+    # sees every source the partner is already mapped from.
+    for partner in store.list_partners():
+        if partner["ats"] != ats:
+            continue
+        for version in store.versions_for(ats, partner["payload_type"]):
+            for row in version.mappings:
+                if not row.source.startswith("Static:") and row.source not in seen:
+                    seen.append(row.source)
     return sorted(seen)
 
 

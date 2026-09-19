@@ -61,6 +61,8 @@ export function MappingReviewScreen({
   const [sourceFields, setSourceFields] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [draftSource, setDraftSource] = useState("");
+  // free text is a deliberate choice, not the only way in
+  const [typing, setTyping] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -125,6 +127,9 @@ export function MappingReviewScreen({
   function startEdit(destination: string, current: string) {
     setEditing(destination);
     setDraftSource(current);
+    // a source the dropdown does not offer - a constant, or a path from a
+    // payload we have not kept - opens straight into the text box
+    setTyping(Boolean(current) && !sourceFields.includes(current));
   }
 
   async function saveEdit(destination: string, remove = false) {
@@ -214,19 +219,46 @@ export function MappingReviewScreen({
   /** A draft can be corrected; an approved version is history. */
   const canEdit = mapping.status === "draft";
 
+  const TYPE_IT = "__type__";
+
   function sourcePicker(destination: string) {
     return (
       <span className="map-edit">
         <label className="sr-only" htmlFor={`src-${destination}`}>
           Source field for {destination}
         </label>
-        <input
-          id={`src-${destination}`}
-          list="partner-source-fields"
-          value={draftSource}
-          onChange={(event) => setDraftSource(event.target.value)}
-          placeholder="Person.Email or Static:value"
-        />
+        {typing ? (
+          <input
+            id={`src-${destination}`}
+            autoFocus
+            value={draftSource}
+            onChange={(event) => setDraftSource(event.target.value)}
+            placeholder="Person.Email or Static:value"
+          />
+        ) : (
+          <select
+            id={`src-${destination}`}
+            value={sourceFields.includes(draftSource) ? draftSource : ""}
+            onChange={(event) => {
+              if (event.target.value === TYPE_IT) {
+                setTyping(true);
+                setDraftSource("");
+              } else {
+                setDraftSource(event.target.value);
+              }
+            }}
+          >
+            <option value="" disabled>
+              Choose a field {sourceFields.length ? "" : "(none known yet)"}
+            </option>
+            {sourceFields.map((path) => (
+              <option key={path} value={path}>
+                {path}
+              </option>
+            ))}
+            <option value={TYPE_IT}>Type it instead...</option>
+          </select>
+        )}
         <button
           className="secondary-button"
           disabled={saving || !draftSource.trim()}
@@ -234,7 +266,13 @@ export function MappingReviewScreen({
         >
           Save
         </button>
-        <button className="link-button" onClick={() => setEditing(null)}>
+        <button
+          className="link-button"
+          onClick={() => {
+            setEditing(null);
+            setTyping(false);
+          }}
+        >
           Cancel
         </button>
       </span>
@@ -243,11 +281,6 @@ export function MappingReviewScreen({
 
   return (
     <div className="page-wrap">
-      <datalist id="partner-source-fields">
-        {sourceFields.map((path) => (
-          <option key={path} value={path} />
-        ))}
-      </datalist>
       <section className="page-heading">
         <div>
           <button className="back-link" onClick={onDone}>
