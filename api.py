@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from bedrock_proposer import make_adapter
-from pipeline import AiUsageLog, DriftTracker, ExceptionQueue, MappingStore, Pipeline, ValidationRuleStore, apply_mapping, parse_input
+from pipeline import AiUsageLog, DriftTracker, ExceptionQueue, MappingStore, Pipeline, RuleBindingStore, ValidationRuleStore, apply_mapping, parse_input
 
 ROOT = Path(__file__).resolve().parent
 app = FastAPI(title="Mapping Pipeline")
@@ -19,6 +19,12 @@ store = MappingStore(ROOT / "mapping_store.json")
 queue = ExceptionQueue(ROOT / "exceptions.json")
 tracker = DriftTracker(path=ROOT / "drift_counts.json")
 rules_store = ValidationRuleStore(ROOT / "validation_rules.json")
+bindings = RuleBindingStore(ROOT / "rule_bindings.json")
+
+
+def rules_for(ats: str):
+    """The catalogue as this partner is held to it."""
+    return bindings.rules_for(ats, rules_store.all())
 from pipeline import ProcessingLog
 
 log = ProcessingLog(ROOT / "processing_log.json")
@@ -100,7 +106,7 @@ def approve_mapping(ats: str, payload_type: str, version: int, body: ApproveRequ
             version,
             body.reviewer,
             replay_payloads_for(ats),
-            rules_store.rules_for(ats),
+            rules_for(ats),
         )
     except ValueError as error:
         raise HTTPException(400, str(error))
@@ -113,7 +119,7 @@ def replay_check(ats: str, payload_type: str, version: int):
         raise HTTPException(404, "Version not found")
     results = []
     for index, payload in enumerate(replay_payloads_for(ats)):
-        outcome = apply_mapping(mapping, payload, rules_store.rules_for(ats))
+        outcome = apply_mapping(mapping, payload, rules_for(ats))
         results.append({
             "payload": {"ideal-ats": ["ideallogic-order.json"], "vsys": ["vsys-order.xml", "vsys-order-2addresses.xml"]}.get(ats, [])[index],
             "status": outcome.status,
@@ -144,7 +150,7 @@ def process_payload(payload: dict):
     ats = payload.get("ats", "")
     payload_type = payload.get("payload_type", "")
     data = payload.get("data", {})
-    result = pipeline.process(ats, payload_type, data, rules_store.rules_for(ats))
+    result = pipeline.process(ats, payload_type, data, rules_for(ats))
     log.add(ats, payload_type, result)
     if result.status == "exception":
         queue.add(ats, payload_type, data, result)
@@ -197,12 +203,13 @@ class RuleUpdate(BaseModel):
 
 @app.get("/api/validation-rules")
 def get_validation_rules(ats: str | None = None):
-    rules = rules_store.rules_for(ats) if ats else rules_store.all()
+    rules = rules_for(ats) if ats else rules_store.all()
     return [asdict(rule) for rule in rules]
 
 
 @app.patch("/api/validation-rules/{rule_id}")
 def update_validation_rule(rule_id: str, body: RuleUpdate):
+    """Edit the catalogue rule itself - this is every partner's default."""
     changes = {key: value for key, value in body.model_dump().items() if value is not None}
     if not changes:
         raise HTTPException(400, "Nothing to change")
@@ -210,6 +217,24 @@ def update_validation_rule(rule_id: str, body: RuleUpdate):
         return asdict(rules_store.update(rule_id, **changes))
     except KeyError as error:
         raise HTTPException(404, str(error)) from error
+
+
+@app.patch("/api/partners/{ats}/validation-rules/{rule_id}")
+def bind_validation_rule(ats: str, rule_id: str, body: RuleUpdate):
+    """Decide whether one partner is held to one catalogue rule.
+
+    This is the per-onboarding choice, and it touches nothing else: the same
+    rule stays exactly as it was for every other partner.
+    """
+    changes = {key: value for key, value in body.model_dump().items() if value is not None}
+    if not changes:
+        raise HTTPException(400, "Nothing to change")
+    if not any(rule.id == rule_id for rule in rules_store.all()):
+        raise HTTPException(404, f"Unknown rule: {rule_id}")
+    bindings.set(ats, rule_id, **changes)
+    return next(
+        asdict(rule) for rule in rules_for(ats) if rule.id == rule_id
+    )
 
 
 DIST = ROOT / "frontend" / "dist"

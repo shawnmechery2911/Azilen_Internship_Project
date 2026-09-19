@@ -13,7 +13,7 @@ import sys
 import threading
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import asdict, dataclass, field, replace as replace_fields
+from dataclasses import asdict, dataclass, field, fields, replace as replace_fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Protocol
@@ -166,7 +166,6 @@ class ValidationRule:
     allowed_values: tuple[str, ...] = ()
     check: str | None = None
     enabled: bool = True
-    ats: str | None = None
 
 
 def check_min_age_18(value: str) -> str | None:
@@ -403,21 +402,21 @@ class ValidationRuleStore(JsonBacked):
         if not self.path.exists() or not self.path.read_text(encoding="utf-8").strip():
             self.rules = []
             return
+        known = {f.name for f in fields(ValidationRule)}
         self.rules = [
-            ValidationRule(**{**item, "allowed_values": tuple(item.get("allowed_values", ()))})
+            # Keys the catalogue no longer carries are dropped rather than
+            # raising: "ats" lived here before partner bindings existed, and a
+            # file written by the older version must still load.
+            ValidationRule(**{
+                **{k: v for k, v in item.items() if k in known},
+                "allowed_values": tuple(item.get("allowed_values", ())),
+            })
             for item in json.loads(self.path.read_text(encoding="utf-8"))
         ]
 
     def all(self) -> list[ValidationRule]:
         self._reload_if_changed()
         return self.rules
-
-    def rules_for(self, ats: str) -> list[ValidationRule]:
-        self._reload_if_changed()
-        overrides = {rule.id: rule for rule in self.rules if rule.ats == ats}
-        chosen = [overrides.pop(rule.id, rule) for rule in self.rules if rule.ats is None]
-        chosen.extend(overrides.values())
-        return chosen
 
     def update(self, rule_id: str, **changes: Any) -> ValidationRule:
         self._reload_if_changed()
@@ -437,6 +436,78 @@ class ValidationRuleStore(JsonBacked):
         with self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps([asdict(rule) for rule in self.rules], indent=2), encoding="utf-8")
+        self._stamp = file_stamp(self.path)
+
+
+class RuleBindingStore(JsonBacked):
+    """Which catalogue rules each partner is held to.
+
+    The catalogue says what a rule *is* - a destination field and how a value
+    for it must look. A binding says whether a given partner is held to it.
+    Keeping them apart is what lets one rule serve every partner: without it,
+    holding vsys to an SSN it always sends means authoring a second, duplicate
+    rule for the same destination field, once per partner.
+    """
+
+    def __init__(self, path: str | Path = "rule_bindings.json") -> None:
+        self.path = Path(path)
+        self._lock = threading.Lock()
+        self.bindings: dict[str, dict[str, dict[str, bool]]] = {}
+        self._stamp: tuple[int, int] | None = None
+        self._load()
+
+    def _load(self) -> None:
+        self._stamp = file_stamp(self.path)
+        if not self.path.exists() or not self.path.read_text(encoding="utf-8").strip():
+            self.bindings = {}
+            return
+        self.bindings = json.loads(self.path.read_text(encoding="utf-8"))
+
+    def for_ats(self, ats: str) -> dict[str, dict[str, bool]]:
+        self._reload_if_changed()
+        return dict(self.bindings.get(ats, {}))
+
+    def rules_for(self, ats: str, catalogue: list[ValidationRule]) -> list[ValidationRule]:
+        """The catalogue as this partner is held to it.
+
+        A rule the partner has never been configured for keeps the catalogue's
+        own enabled flag but is not required: a shape check costs nothing when
+        the field is absent, while demanding presence depends entirely on what
+        the partner actually sends, which is learned at onboarding.
+        """
+        chosen = self.for_ats(ats)
+        applied = []
+        for rule in catalogue:
+            binding = chosen.get(rule.id)
+            if binding is None:
+                applied.append(replace_fields(rule, required=False))
+            else:
+                applied.append(
+                    replace_fields(
+                        rule,
+                        enabled=binding.get("enabled", rule.enabled),
+                        required=binding.get("required", False),
+                    )
+                )
+        return applied
+
+    def set(self, ats: str, rule_id: str, **changes: bool) -> dict[str, bool]:
+        self._reload_if_changed()
+        partner = self.bindings.setdefault(ats, {})
+        current = partner.setdefault(rule_id, {"enabled": True, "required": False})
+        current.update({k: v for k, v in changes.items() if v is not None})
+        self._save()
+        return current
+
+    def forget(self, ats: str) -> None:
+        self._reload_if_changed()
+        self.bindings.pop(ats, None)
+        self._save()
+
+    def _save(self) -> None:
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(self.bindings, indent=2), encoding="utf-8")
         self._stamp = file_stamp(self.path)
 
 

@@ -29,10 +29,12 @@ DEFAULT_RULES = [
     ValidationRule("fcra_purpose", "FCRAPermissibleType", "Format", "a permissible FCRA purpose", allowed_values=("Preemployment Screening", "Volunteer", "Employment Screening", "Tenant Screening")),
     ValidationRule("dob_min_age_18", "Applicant.DateOfBirth", "Business", "an applicant aged 18 or over", check="min_age_18"),
     ValidationRule("ssn_not_placeholder", "Applicant.SSN", "Business", "an SSN that could be real", check="ssn_not_placeholder"),
-    ValidationRule("ssn_required_vsys", "Applicant.SSN", "Completeness", "vsys always sends an SSN", required=True, ats="vsys"),
-    ValidationRule("dob_required_vsys", "Applicant.DateOfBirth", "Completeness", "vsys always sends a date of birth", required=True, ats="vsys"),
-    ValidationRule("phone_required_vsys", "Applicant.PhoneNumber", "Completeness", "vsys always sends a phone number", required=True, ats="vsys"),
-    ValidationRule("city_required_vsys", "Applicant.Addresses.City", "Completeness", "vsys always sends an address history", required=True, ats="vsys"),
+    # These were four near-duplicate rules carrying ats="vsys". They are ordinary
+    # catalogue rules now; whether a partner is held to them is a binding.
+    ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "a social security number", required=True),
+    ValidationRule("dob_present", "Applicant.DateOfBirth", "Completeness", "a date of birth", required=True),
+    ValidationRule("phone_present", "Applicant.PhoneNumber", "Completeness", "a phone number", required=True),
+    ValidationRule("city_present", "Applicant.Addresses.City", "Completeness", "an address history", required=True),
     # Every remaining destination field, so all 18 appear on the Validation
     # screen and presence can be demanded per partner with a toggle. They ship
     # not-required because no current partner sends them - switching one on

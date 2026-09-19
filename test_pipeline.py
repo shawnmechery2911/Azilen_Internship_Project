@@ -18,6 +18,7 @@ from pipeline import (
     MappingDraft,
     MappingStore,
     Pipeline,
+    RuleBindingStore,
     ValidationRule,
     ValidationRuleStore,
     parse_input,
@@ -431,18 +432,53 @@ class PipelineTests(unittest.TestCase):
         self.assertIsNotNone(check_ssn_not_placeholder("111111111"))
         self.assertIsNotNone(check_ssn_not_placeholder("000123456"))
 
-    def test_rules_are_per_partner(self):
+    def catalogue(self, folder):
+        rules = ValidationRuleStore(Path(folder) / "rules.json")
+        rules.replace_all([
+            ValidationRule("email_format", "Applicant.Email", "Format", "an email", pattern=r"[^@\s]+@[^@\s]+\.[^@\s]+"),
+            ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "an SSN", required=True),
+        ])
+        return rules
+
+    def test_one_rule_serves_every_partner(self):
+        """The catalogue is shared. Which partners are held to a rule is a
+        binding, so a rule is written once rather than once per partner."""
         with TemporaryDirectory() as folder:
-            rules = ValidationRuleStore(Path(folder) / "rules.json")
-            rules.replace_all([
-                ValidationRule("email_present", "Applicant.Email", "Completeness", "an email", required=True),
-                ValidationRule("ssn_required_vsys", "Applicant.SSN", "Completeness", "vsys sends an SSN", required=True, ats="vsys"),
-            ])
-            vsys_fields = {rule.field for rule in rules.rules_for("vsys")}
-            ideal_fields = {rule.field for rule in rules.rules_for("ideal-ats")}
-        self.assertIn("Applicant.SSN", vsys_fields)
-        self.assertNotIn("Applicant.SSN", ideal_fields)
-        self.assertIn("Applicant.Email", ideal_fields)
+            rules = self.catalogue(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            for ats in ("vsys", "ideal-ats"):
+                ids = {rule.id for rule in binds.rules_for(ats, rules.all())}
+                self.assertEqual(ids, {"email_format", "ssn_present"})
+
+    def test_presence_is_off_until_a_partner_is_bound_to_it(self):
+        """A new partner gets shape checks but no presence demands, because
+        what a partner actually sends is learned at onboarding."""
+        with TemporaryDirectory() as folder:
+            rules = self.catalogue(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            fresh = {rule.id: rule for rule in binds.rules_for("brand-new", rules.all())}
+            self.assertTrue(fresh["email_format"].enabled)
+            self.assertFalse(fresh["ssn_present"].required)
+
+            binds.set("vsys", "ssn_present", required=True)
+            vsys = {rule.id: rule for rule in binds.rules_for("vsys", rules.all())}
+            ideal = {rule.id: rule for rule in binds.rules_for("ideal-ats", rules.all())}
+            self.assertTrue(vsys["ssn_present"].required)
+            self.assertFalse(ideal["ssn_present"].required)
+
+    def test_binding_one_partner_leaves_the_others_alone(self):
+        """Turning a rule off used to turn it off for everybody - the defect
+        this split exists to fix."""
+        with TemporaryDirectory() as folder:
+            rules = self.catalogue(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("vsys", "email_format", enabled=False)
+            vsys = {rule.id: rule for rule in binds.rules_for("vsys", rules.all())}
+            ideal = {rule.id: rule for rule in binds.rules_for("ideal-ats", rules.all())}
+            self.assertFalse(vsys["email_format"].enabled)
+            self.assertTrue(ideal["email_format"].enabled)
+            # and the catalogue itself is untouched
+            self.assertTrue(next(r for r in rules.all() if r.id == "email_format").enabled)
 
     def test_a_disabled_rule_does_nothing(self):
         rule = ValidationRule("email_format", "Applicant.Email", "Format", "an email", pattern=r"[^@\s]+@[^@\s]+\.[^@\s]+", enabled=False)
