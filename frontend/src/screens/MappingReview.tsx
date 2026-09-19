@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  type FieldMapping,
   approveMapping,
   getDestinationFields,
   getFixtures,
@@ -48,6 +49,8 @@ export function MappingReviewScreen({
   const [replay, setReplay] = useState<ReplayResult | null>(null);
   const [destinations, setDestinations] = useState<string[]>([]);
   const [fixtures, setFixtures] = useState<FixturePayload[]>([]);
+  const [previous, setPrevious] = useState<MappingVersion | null>(null);
+  const [onlyChanges, setOnlyChanges] = useState(false);
   const [reviewer, setReviewer] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,6 +64,12 @@ export function MappingReviewScreen({
         getFixtures(),
       ]);
       setMapping(versions.find((item) => item.version === version) ?? null);
+      // the version immediately before this one is what a reviewer is
+      // approving a change against
+      const earlier = versions
+        .filter((item) => item.version < version)
+        .sort((a, b) => b.version - a.version);
+      setPrevious(earlier[0] ?? null);
       setReplay(nextReplay);
       setDestinations(nextDest);
       setFixtures(nextFixtures);
@@ -76,6 +85,31 @@ export function MappingReviewScreen({
     () => fixtures.find((item) => item.ats === ats)?.data ?? null,
     [fixtures, ats],
   );
+
+  /** What actually changed since the previous version, keyed by destination. */
+  const diff = useMemo(() => {
+    const before = new Map<string, FieldMapping>();
+    for (const rule of previous?.mappings ?? []) before.set(rule.destination, rule);
+    const added = new Set<string>();
+    const changed = new Map<string, FieldMapping>();
+    for (const rule of mapping?.mappings ?? []) {
+      const was = before.get(rule.destination);
+      if (!was) {
+        added.add(rule.destination);
+      } else if (
+        was.source !== rule.source ||
+        was.transform !== rule.transform ||
+        was.required !== rule.required ||
+        was.source_is_list !== rule.source_is_list
+      ) {
+        changed.set(rule.destination, was);
+      }
+      before.delete(rule.destination);
+    }
+    return { added, changed, removed: [...before.values()] };
+  }, [mapping, previous]);
+
+  const changeCount = diff.added.size + diff.changed.size + diff.removed.length;
 
   async function approve() {
     setBusy(true);
@@ -191,10 +225,34 @@ export function MappingReviewScreen({
           <strong>{checked}</strong>
           <span>stored orders replayed</span>
         </div>
+        {previous && (
+          <div>
+            <strong>{changeCount}</strong>
+            <span>changed since v{previous.version}</span>
+          </div>
+        )}
       </section>
 
       <section className="panel">
-        <h2>Field mappings</h2>
+        <div className="panel-head-row">
+          <h2>Field mappings</h2>
+          {previous && (
+            <div className="filter-group">
+              <button
+                className={onlyChanges ? "" : "filter-active"}
+                onClick={() => setOnlyChanges(false)}
+              >
+                all {mapping.mappings.length}
+              </button>
+              <button
+                className={onlyChanges ? "filter-active" : ""}
+                onClick={() => setOnlyChanges(true)}
+              >
+                changed since v{previous.version} ({changeCount})
+              </button>
+            </div>
+          )}
+        </div>
         <div className="map-table">
           <div className="map-head">
             <span>{ats} sends</span>
@@ -202,19 +260,33 @@ export function MappingReviewScreen({
             <span>we store it as</span>
             <span>example</span>
           </div>
-          {mapping.mappings.map((rule, index) => {
+          {mapping.mappings
+            .filter(
+              (rule) =>
+                !onlyChanges ||
+                diff.added.has(rule.destination) ||
+                diff.changed.has(rule.destination),
+            )
+            .map((rule, index) => {
             const example = sample ? valueAt(sample, rule.source) : null;
             const source = describeSource(rule.source);
+            const wasRule = diff.changed.get(rule.destination);
+            const isNew = diff.added.has(rule.destination);
             const notes = [
               rule.transform ? `transform: ${rule.transform}` : null,
               rule.source_is_list ? "list" : null,
               rule.required ? "required" : null,
             ].filter(Boolean);
             return (
-              <div className="map-line" key={`${rule.destination}-${index}`}>
+              <div
+                className={`map-line${isNew ? " map-line-new" : ""}${wasRule ? " map-line-changed" : ""}`}
+                key={`${rule.destination}-${index}`}
+              >
                 <span className="map-src">
                   <code>{source.text}</code>
                   {source.constant && <em className="map-const">constant</em>}
+                  {isNew && <em className="map-tag map-tag-new">new</em>}
+                  {wasRule && <em className="map-tag map-tag-changed">changed</em>}
                 </span>
                 <span className="map-arrow" aria-hidden="true">
                   →
@@ -223,6 +295,11 @@ export function MappingReviewScreen({
                 <span className="map-sample">
                   {source.constant ? "" : (example ?? "—")}
                 </span>
+                {wasRule && (
+                  <span className="map-note map-was">
+                    was <code>{describeSource(wasRule.source).text}</code>
+                  </span>
+                )}
                 {(rule.reason || notes.length > 0) && (
                   <span className="map-note">
                     {rule.reason}
@@ -233,7 +310,28 @@ export function MappingReviewScreen({
               </div>
             );
           })}
+          {diff.removed.map((rule, index) => (
+            <div
+              className="map-line map-line-removed"
+              key={`removed-${rule.destination}-${index}`}
+            >
+              <span className="map-src">
+                <code>{describeSource(rule.source).text}</code>
+                <em className="map-tag map-tag-removed">removed</em>
+              </span>
+              <span className="map-arrow" aria-hidden="true">
+                →
+              </span>
+              <code className="map-dest">{rule.destination}</code>
+              <span className="map-sample" />
+            </div>
+          ))}
         </div>
+        {previous && changeCount === 0 && (
+          <EmptyState
+            label={`Nothing changed between v${previous.version} and v${version}.`}
+          />
+        )}
       </section>
 
       <div className="content-grid">

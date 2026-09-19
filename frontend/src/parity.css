@@ -1069,3 +1069,60 @@ button.row:hover .row-action {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* --- mapping diff -----------------------------------------------------------
+   Approving v2 is approving a change, so the change is what gets marked.
+   --------------------------------------------------------------------------- */
+.panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.panel-head-row h2 {
+  margin: 0;
+}
+.map-line-new {
+  box-shadow: inset 2px 0 var(--green);
+  padding-left: 10px;
+}
+.map-line-changed {
+  box-shadow: inset 2px 0 var(--amber);
+  padding-left: 10px;
+}
+.map-line-removed {
+  box-shadow: inset 2px 0 var(--red);
+  padding-left: 10px;
+  opacity: 0.72;
+}
+.map-line-removed .map-dest,
+.map-line-removed .map-src code {
+  text-decoration: line-through;
+}
+.map-tag {
+  margin-left: 7px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-style: normal;
+  font-size: var(--fs-label);
+  font-weight: 700;
+}
+.map-tag-new {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.map-tag-changed {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.map-tag-removed {
+  background: var(--red-soft);
+  color: var(--red);
+}
+.map-was code {
+  font-family: var(--mono);
+  color: var(--muted-2);
+  text-decoration: line-through;
+}
