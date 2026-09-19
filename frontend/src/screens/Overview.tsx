@@ -169,9 +169,9 @@ export function OverviewScreen({
         <h2>Needs attention</h2>
         {attention.length ? (
           attention.map((item) => (
-            <button className="row-link" key={item.key} onClick={item.run}>
-              <strong>{item.ats}</strong>
-              <span>{item.what}</span>
+            <button className="row" key={item.key} onClick={item.run}>
+              <span className="row-name">{item.ats}</span>
+              <span className="row-desc">{item.what}</span>
               <em className="row-action">
                 {item.action}
                 <span aria-hidden="true">›</span>
@@ -191,19 +191,22 @@ export function OverviewScreen({
           const rows = versions[key];
           return (
             <div key={key}>
-              <button className="row-link" onClick={() => void togglePartner(partner)}>
-                <strong>{partner.ats}</strong>
-                <span>
-                  {partner.payload_type} ·{" "}
-                  {partner.version === null
-                    ? "needs mapping"
-                    : `v${partner.version} ${partner.status}`}
-                </span>
-                {partner.pending_drafts > 0 && (
+              <button className="row row-partner" onClick={() => void togglePartner(partner)}>
+                <span className="row-name">{partner.ats}</span>
+                <span className="row-desc">{partner.payload_type}</span>
+                {partner.pending_drafts > 0 ? (
                   <span className="row-badge">
                     {plural(partner.pending_drafts, "draft")}
                   </span>
+                ) : (
+                  <span className="row-cell-empty" />
                 )}
+                <span className={`status status-${partner.status}`}>
+                  {partner.status.replace("_", " ")}
+                </span>
+                <code className="row-meta">
+                  {partner.version === null ? "—" : `v${partner.version}`}
+                </code>
                 <em className="row-action">
                   {isOpen ? "Hide" : "Versions"}
                   <span aria-hidden="true">{isOpen ? "⌃" : "⌄"}</span>
@@ -214,7 +217,7 @@ export function OverviewScreen({
                   {rows ? (
                     rows.map((version) => (
                       <button
-                        className="row-link row-nested"
+                        className="row row-nested"
                         key={version.version}
                         onClick={() =>
                           onReview(
@@ -224,9 +227,12 @@ export function OverviewScreen({
                           )
                         }
                       >
-                        <strong>Version {version.version}</strong>
-                        <span>
-                          {version.status} · proposed by {version.proposed_by}
+                        <span className="row-name">v{version.version}</span>
+                        <span className="row-desc">
+                          proposed by {version.proposed_by}
+                        </span>
+                        <span className={`status status-${version.status}`}>
+                          {version.status}
                         </span>
                         <em className="row-action">
                           Open review
@@ -259,13 +265,14 @@ export function OverviewScreen({
         </div>
         {filtered.length ? (
           filtered.map((item) => (
-            <div className="row-link row-static" key={item.id}>
-              <strong>{item.ats}</strong>
-              <span>
-                {item.payload_type} · {item.status}
+            <div className="row row-activity" key={item.id}>
+              <span className="row-name">{item.ats}</span>
+              <span className="row-desc">{item.payload_type}</span>
+              <span className={`status status-${item.status}`}>
+                {item.status.replace("_", " ")}
               </span>
               <code className="row-meta">
-                v{item.mapping_version ?? "-"} ·{" "}
+                v{item.mapping_version ?? "—"} ·{" "}
                 {plural(item.issue_count, "issue")}
               </code>
               <span className="row-time">{since(item.processed_at)}</span>
