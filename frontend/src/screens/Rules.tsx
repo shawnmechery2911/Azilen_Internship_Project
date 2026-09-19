@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  bindValidationRule,
+  getPartners,
   getValidationRules,
   updateValidationRule,
+  type Partner,
   type ValidationRule,
 } from "../api";
 import { EmptyState, ErrorPanel, Loading } from "../components/ScreenState";
@@ -13,19 +16,26 @@ export function RulesScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("All");
+  const [partners, setPartners] = useState<Partner[]>([]);
+  // "" means the catalogue itself - the default every partner starts from
+  const [scope, setScope] = useState<string>("");
   const [savedRule, setSavedRule] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      setRules(await getValidationRules());
+      const [nextRules, nextPartners] = await Promise.all([
+        getValidationRules(scope || undefined),
+        getPartners(),
+      ]);
+      setRules(nextRules);
+      setPartners(nextPartners);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load rules");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [scope]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -36,7 +46,12 @@ export function RulesScreen() {
     setBusy(rule.id);
     setError("");
     try {
-      await updateValidationRule(rule.id, changes);
+      // a partner scope writes a binding; the catalogue scope writes the rule
+      if (scope) {
+        await bindValidationRule(scope, rule.id, changes);
+      } else {
+        await updateValidationRule(rule.id, changes);
+      }
       setSavedRule(rule.id);
       setTimeout(() => setSavedRule((current) => (current === rule.id ? null : current)), 1200);
       await load();
@@ -68,10 +83,6 @@ export function RulesScreen() {
         </div>
       </div>
     );
-  const filteredRules =
-    filter === "All"
-      ? rules
-      : rules.filter((rule) => rule.ats === null || rule.ats === filter);
   return (
     <div className="page-wrap">
       <section className="page-heading">
@@ -87,18 +98,24 @@ export function RulesScreen() {
       </section>
       {error && <div className="toast">{error}</div>}
       <div className="filter-group" style={{ marginBottom: 16 }}>
-        {['All', 'ideal-ats', 'vsys'].map((option) => (
+        <button
+          className={scope === "" ? "filter-active" : ""}
+          onClick={() => setScope("")}
+        >
+          catalogue default
+        </button>
+        {partners.map((partner) => (
           <button
-            key={option}
-            className={filter === option ? "filter-active" : ""}
-            onClick={() => setFilter(option)}
+            key={partner.ats}
+            className={scope === partner.ats ? "filter-active" : ""}
+            onClick={() => setScope(partner.ats)}
           >
-            {option}
+            {partner.ats}
           </button>
         ))}
       </div>
       {GROUPS.map((group) => {
-        const inGroup = filteredRules.filter((rule) => rule.group === group);
+        const inGroup = rules.filter((rule) => rule.group === group);
         if (!inGroup.length) return null;
         return (
           <section className="panel rules-section" key={group}>
@@ -112,7 +129,6 @@ export function RulesScreen() {
               <div className="rules-header">
                 <span>Field</span>
                 <span>Check</span>
-                <span>Partner</span>
                 <span>Must be present</span>
                 <span>Rule active</span>
               </div>
@@ -129,7 +145,6 @@ export function RulesScreen() {
                       <small>one of: {rule.allowed_values.join(", ")}</small>
                     )}
                   </span>
-                  <span>{rule.ats ?? "all"}</span>
                   <div className="rules-cell">
                     <label className="switch">
                       <input

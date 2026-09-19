@@ -100,7 +100,6 @@ export interface ValidationRule {
   allowed_values: string[];
   check: string | null;
   enabled: boolean;
-  ats: string | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -174,6 +173,16 @@ export function getValidationRules(ats?: string): Promise<ValidationRule[]> {
   return request<ValidationRule[]>(
     `/validation-rules${ats ? `?ats=${encodeURIComponent(ats)}` : ""}`,
   );
+}
+export function bindValidationRule(
+  ats: string,
+  ruleId: string,
+  changes: { enabled?: boolean; required?: boolean },
+): Promise<ValidationRule> {
+  return request(`/partners/${ats}/validation-rules/${ruleId}`, {
+    method: "PATCH",
+    body: JSON.stringify(changes),
+  });
 }
 export function updateValidationRule(
   id: string,

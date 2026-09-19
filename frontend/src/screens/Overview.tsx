@@ -179,12 +179,21 @@ export function OverviewScreen({
             </button>
           ))
         ) : (
-          <EmptyState label="Nothing needs attention. Every partner is mapped and processing." />
+          <EmptyState
+            label={
+              partners.length
+                ? "Nothing needs attention. Every partner is mapped and processing."
+                : "No partners yet. Onboard one to get started."
+            }
+          />
         )}
       </section>
 
       <section className="panel">
         <h2>Partners</h2>
+        {partners.length === 0 && (
+          <EmptyState label="No partners connected yet." />
+        )}
         {partners.map((partner) => {
           const key = `${partner.ats}-${partner.payload_type}`;
           const isOpen = expanded === key;
@@ -279,7 +288,13 @@ export function OverviewScreen({
             </div>
           ))
         ) : (
-          <EmptyState label="No activity matches this filter." />
+          <EmptyState
+            label={
+              activity.length
+                ? "No activity matches this filter."
+                : "No orders have been processed yet."
+            }
+          />
         )}
       </section>
 
