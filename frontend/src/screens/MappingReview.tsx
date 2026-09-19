@@ -9,6 +9,7 @@ import {
   getReplay,
   getVersions,
   type FixturePayload,
+  type SourceField,
   type MappingVersion,
   type ReplayResult,
 } from "../api";
@@ -58,7 +59,7 @@ export function MappingReviewScreen({
   const [previous, setPrevious] = useState<MappingVersion | null>(null);
   const [onlyChanges, setOnlyChanges] = useState(false);
   const [reviewer, setReviewer] = useState("");
-  const [sourceFields, setSourceFields] = useState<string[]>([]);
+  const [sourceFields, setSourceFields] = useState<SourceField[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [draftSource, setDraftSource] = useState("");
   // free text is a deliberate choice, not the only way in
@@ -129,7 +130,9 @@ export function MappingReviewScreen({
     setDraftSource(current);
     // a source the dropdown does not offer - a constant, or a path from a
     // payload we have not kept - opens straight into the text box
-    setTyping(Boolean(current) && !sourceFields.includes(current));
+    setTyping(
+      Boolean(current) && !sourceFields.some((f) => f.path === current),
+    );
   }
 
   async function saveEdit(destination: string, remove = false) {
@@ -238,7 +241,9 @@ export function MappingReviewScreen({
         ) : (
           <select
             id={`src-${destination}`}
-            value={sourceFields.includes(draftSource) ? draftSource : ""}
+            value={
+              sourceFields.some((f) => f.path === draftSource) ? draftSource : ""
+            }
             onChange={(event) => {
               if (event.target.value === TYPE_IT) {
                 setTyping(true);
@@ -251,9 +256,11 @@ export function MappingReviewScreen({
             <option value="" disabled>
               Choose a field {sourceFields.length ? "" : "(none known yet)"}
             </option>
-            {sourceFields.map((path) => (
-              <option key={path} value={path}>
-                {path}
+            {sourceFields.map((field) => (
+              <option key={field.path} value={field.path}>
+                {field.example
+                  ? `${field.path} — ${field.example.slice(0, 32)}`
+                  : field.path}
               </option>
             ))}
             <option value={TYPE_IT}>Type it instead...</option>

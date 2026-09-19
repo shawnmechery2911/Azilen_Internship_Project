@@ -182,7 +182,11 @@ export interface PartnerSample {
 export function getPartnerSamples(ats: string): Promise<PartnerSample[]> {
   return request(`/partners/${ats}/samples`);
 }
-export function getPartnerSourceFields(ats: string): Promise<string[]> {
+export interface SourceField {
+  path: string;
+  example: string | null;
+}
+export function getPartnerSourceFields(ats: string): Promise<SourceField[]> {
   return request(`/partners/${ats}/source-fields`);
 }
 export function editDraftMapping(

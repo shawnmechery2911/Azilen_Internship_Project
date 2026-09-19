@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from bedrock_proposer import make_adapter
-from pipeline import AiUsageLog, DriftTracker, ExceptionQueue, MappingStore, Pipeline, RuleBindingStore, SamplePayloadStore, ValidationRuleStore, apply_mapping, parse_input
+from pipeline import AiUsageLog, get_path, DriftTracker, ExceptionQueue, MappingStore, Pipeline, RuleBindingStore, SamplePayloadStore, ValidationRuleStore, apply_mapping, parse_input
 
 ROOT = Path(__file__).resolve().parent
 app = FastAPI(title="Mapping Pipeline")
@@ -145,10 +145,20 @@ def partner_source_fields(ats: str):
     sends, not typing a path from memory.
     """
     seen: list[str] = []
+    examples: dict[str, str] = {}
     for payload in replay_payloads_for(ats):
         for path in leaf_paths(payload):
             if path not in seen:
                 seen.append(path)
+            if path not in examples:
+                # the value decides it when the name does not: PartnerSystem
+                # and Username are both plausible senders until you see
+                # "ideallogic" next to "smcdonald"
+                value = get_path(payload, path)
+                if isinstance(value, list):
+                    value = value[0] if value else None
+                if value is not None and not isinstance(value, (dict, list)):
+                    examples[path] = str(value)
     # Paths already used by this partner's mappings, so the list is useful even
     # for a draft made before payloads were being kept - at minimum a reviewer
     # sees every source the partner is already mapped from.
@@ -159,7 +169,7 @@ def partner_source_fields(ats: str):
             for row in version.mappings:
                 if not row.source.startswith("Static:") and row.source not in seen:
                     seen.append(row.source)
-    return sorted(seen)
+    return [{"path": path, "example": examples.get(path)} for path in sorted(seen)]
 
 
 @app.patch("/api/mappings/{ats}/{payload_type}/{version}/mapping")
