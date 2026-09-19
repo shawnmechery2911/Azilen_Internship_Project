@@ -289,33 +289,31 @@ export function OverviewScreen({
 }
 
 function CostPanel({ usage }: { usage: AiUsage }) {
-  const perOrder = usage.orders_processed
-    ? (usage.calls / usage.orders_processed).toFixed(2)
-    : "0.00";
   return (
-    <section className="cost-panel">
-      <div className="cost-headline">
-        <strong>{usage.calls}</strong>
-        <span>
-          AI call{usage.calls === 1 ? "" : "s"} total, across{" "}
-          {usage.partners_onboarded} partner
-          {usage.partners_onboarded === 1 ? "" : "s"} - and{" "}
-          <strong>{perOrder}</strong> per order across {usage.orders_processed}{" "}
-          order{usage.orders_processed === 1 ? "" : "s"} processed.
-        </span>
-      </div>
-      <div className="cost-figures">
+    <section className="panel">
+      <h2>AI usage</h2>
+      <div className="coverage coverage-plain">
         <div>
-          <span>Input tokens</span>
+          <strong>{usage.calls}</strong>
+          <span>calls at runtime</span>
+        </div>
+        <div>
+          <strong>{usage.orders_processed}</strong>
+          <span>orders processed</span>
+        </div>
+        <div>
           <strong>{usage.input_tokens.toLocaleString()}</strong>
+          <span>input tokens</span>
         </div>
         <div>
-          <span>Output tokens</span>
           <strong>{usage.output_tokens.toLocaleString()}</strong>
+          <span>output tokens</span>
         </div>
         <div>
-          <span>Model</span>
-          <strong>{usage.recent[0]?.model ?? "not called yet"}</strong>
+          <strong className="coverage-model">
+            {usage.recent[0]?.model ?? "—"}
+          </strong>
+          <span>model</span>
         </div>
       </div>
     </section>

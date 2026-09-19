@@ -107,56 +107,6 @@
   color: var(--green);
   font-size: var(--fs-body);
 }
-.cost-panel {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 18px 28px;
-  padding: 16px 20px;
-  margin: 18px 0;
-  border-radius: 14px;
-  border: 1px solid var(--line, var(--border));
-  background: var(--panel, var(--surface-2));
-}
-.cost-headline {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex: 1;
-  min-width: 300px;
-}
-.cost-headline > strong {
-  font-size: var(--fs-display);
-  line-height: 1;
-  color: var(--text, var(--text));
-}
-.cost-headline span {
-  font-size: var(--fs-body);
-  color: var(--muted, var(--muted));
-  line-height: 1.5;
-}
-.cost-headline span strong {
-  color: var(--text, var(--text));
-}
-.cost-figures {
-  display: flex;
-  gap: 26px;
-}
-.cost-figures div {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.cost-figures span {
-  font-size: var(--fs-meta);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted, var(--muted));
-}
-.cost-figures strong {
-  font-size: var(--fs-h3);
-  color: var(--text, var(--text));
-}
 @media (max-width: 900px) {
   .payload-grid {
     grid-template-columns: 1fr;
@@ -366,7 +316,7 @@ button.mapping-list-row:hover {
   margin: 14px 0 4px;
 }
 .process-controls select {
-  flex: 0 1 320px;
+  flex: 0 1 220px;
   padding: 9px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -631,6 +581,7 @@ button.mapping-list-row:hover {
 }
 .page-wrap-tight {
   padding-top: 0;
+  margin-top: -18px;
 }
 
 /* --- mapping review ---------------------------------------------------------
@@ -1034,4 +985,20 @@ button.row:hover .row-action {
 }
 .row-cell-empty {
   display: block;
+}
+
+/* The usage stats sit inside a panel now, so they do not need their own frame. */
+.coverage-plain {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 0 0;
+  margin-bottom: 0;
+  flex-wrap: wrap;
+  gap: 32px 40px;
+}
+.coverage-model {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  font-weight: 500;
 }
