@@ -178,6 +178,34 @@ class PipelineTests(unittest.TestCase):
             result = Pipeline(store).process("ats", "candidate", {"middle": "   "})
             self.assertEqual(result.status, "exception")
 
+    def test_a_missing_source_is_reported_once_not_twice(self):
+        """A field the partner never sent fails at the mapping stage. The
+        completeness rule for the same field must not repeat it — the mapping
+        issue already names the source field that is missing."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.Email", "Applicant.Email", True)], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            rules = [ValidationRule("email_required", "Applicant.Email", "Completeness", "an email", required=True)]
+            result = Pipeline(store).process("ats", "candidate", {"Person": {}}, rules)
+            email_issues = [issue for issue in result.issues if issue["field"] == "Applicant.Email"]
+            self.assertEqual(len(email_issues), 1)
+            self.assertEqual(email_issues[0]["group"], "Mapping")
+            self.assertIn("Person.Email", email_issues[0]["message"])
+
+    def test_a_required_field_the_mapping_ignores_is_still_reported(self):
+        """The dedupe must not hide a genuine completeness failure: if nothing
+        maps to a required destination at all, there is no mapping issue to
+        stand in for it."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.First", "Applicant.GivenName")], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            rules = [ValidationRule("email_required", "Applicant.Email", "Completeness", "an email", required=True)]
+            result = Pipeline(store).process("ats", "candidate", {"Person": {"First": "Ada"}}, rules)
+            self.assertEqual([issue["field"] for issue in result.issues], ["Applicant.Email"])
+            self.assertEqual(result.issues[0]["group"], "Completeness")
+
     def test_drift_tracker_is_wired_into_processing(self):
         with TemporaryDirectory() as folder:
             store = MappingStore(Path(folder) / "mappings.json")

@@ -626,19 +626,30 @@ class Pipeline:
             except (TypeError, ValueError) as error:
                 issues.append({"field": item.destination, "message": str(error), "group": "Mapping"})
 
-        issues.extend(self._validate(mapped, rules))
+        issues.extend(self._validate(mapped, rules, {issue["field"] for issue in issues}))
         status = "exception" if issues else "processed"
         drift_alerts = self.drift_tracker.record(ats, payload_type, issues) if self.drift_tracker else []
         return ProcessingResult(status, mapped, issues, mapping.version, drift_alerts)
 
-    def _validate(self, payload: dict[str, Any], rules: Iterable[ValidationRule]) -> list[dict[str, str]]:
+    def _validate(
+        self,
+        payload: dict[str, Any],
+        rules: Iterable[ValidationRule],
+        already_reported: set[str] | frozenset[str] = frozenset(),
+    ) -> list[dict[str, str]]:
+        """Check the mapped payload against the rules.
+
+        Fields in ``already_reported`` failed at the mapping stage, which names the
+        source field the partner did not send. Repeating "required field is missing"
+        for them would report the same root cause twice.
+        """
         issues: list[dict[str, str]] = []
         for rule in rules:
             if not rule.enabled:
                 continue
             value = get_path(payload, rule.field)
             if value is None or value == [] or (isinstance(value, str) and not value.strip()):
-                if rule.required:
+                if rule.required and rule.field not in already_reported:
                     issues.append(_issue(rule, f"Required field is missing: {rule.description or rule.id}"))
                 continue
             for item in value if isinstance(value, list) else [value]:
