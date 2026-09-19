@@ -128,6 +128,36 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(store.for_ats("other"), [{"c": 3}])
             self.assertEqual(store.for_ats("nobody"), [])
 
+    def test_a_rename_retires_orders_written_in_the_old_shape(self):
+        """They describe a payload that will not arrive again, so they are not
+        evidence about the mapping that replaces it."""
+        with TemporaryDirectory() as folder:
+            store = SamplePayloadStore(Path(folder) / "samples.json")
+            store.remember("acme", {"Person": {"ApplicantID": "A1"}})
+            store.remember("acme", {"Person": {"ApplicantID": "A2"}})
+            retired = store.retire("acme", "Person.ApplicantID", "Person.CandidateID")
+            self.assertEqual(retired, 2)
+            self.assertEqual(store.for_ats("acme"), [])
+
+    def test_an_order_already_in_the_new_shape_is_kept(self):
+        """The partner has started sending it, which is exactly what the new
+        mapping should be held to."""
+        with TemporaryDirectory() as folder:
+            store = SamplePayloadStore(Path(folder) / "samples.json")
+            store.remember("acme", {"Person": {"ApplicantID": "old"}})
+            store.remember("acme", {"Person": {"CandidateID": "new"}})
+            retired = store.retire("acme", "Person.ApplicantID", "Person.CandidateID")
+            self.assertEqual(retired, 1)
+            self.assertEqual(store.for_ats("acme"), [{"Person": {"CandidateID": "new"}}])
+
+    def test_retiring_leaves_unrelated_partners_alone(self):
+        with TemporaryDirectory() as folder:
+            store = SamplePayloadStore(Path(folder) / "samples.json")
+            store.remember("acme", {"Person": {"ApplicantID": "A1"}})
+            store.remember("other", {"Person": {"ApplicantID": "B1"}})
+            store.retire("acme", "Person.ApplicantID", "Person.CandidateID")
+            self.assertEqual(store.for_ats("other"), [{"Person": {"ApplicantID": "B1"}}])
+
     def test_the_sample_corpus_is_capped(self):
         """It guards approvals rather than archiving traffic, so it is read on
         every approval and must not grow without bound."""

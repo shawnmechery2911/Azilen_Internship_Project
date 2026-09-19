@@ -83,7 +83,12 @@ function alter(
 export function ProcessPanel({
   onReview,
 }: {
-  onReview: (ats: string, payloadType: string, version: number) => void;
+  onReview: (
+    ats: string,
+    payloadType: string,
+    version: number,
+    retired?: number,
+  ) => void;
 }) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [ats, setAts] = useState("");
@@ -167,13 +172,13 @@ export function ProcessPanel({
     setBusy(true);
     setError("");
     try {
-      const { version } = await remapSource(
+      const { version, retired_samples } = await remapSource(
         partner.ats,
         partner.payload_type,
         from,
         to,
       );
-      onReview(partner.ats, partner.payload_type, version);
+      onReview(partner.ats, partner.payload_type, version, retired_samples);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not remap that field");
     } finally {

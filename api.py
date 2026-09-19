@@ -198,7 +198,11 @@ def remap_source(ats: str, payload_type: str, body: RemapRequest):
     if rows == current.mappings:
         raise HTTPException(400, f"No rule reads {body.from_source}")
     version = store.add_draft(ats, payload_type, rows, proposed_by=body.proposed_by)
-    return {"version": version.version}
+    # Stored orders still carry the old path. Left in place they fail replay
+    # against the very mapping that fixes them, so the guardrail would block
+    # the repair and the only way on would be to override it.
+    retired = samples.retire(ats, body.from_source, body.to_source)
+    return {"version": version.version, "retired_samples": retired}
 
 
 @app.patch("/api/mappings/{ats}/{payload_type}/{version}/mapping")

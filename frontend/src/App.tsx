@@ -16,13 +16,20 @@ function App() {
   const [queueAts, setQueueAts] = useState<string | null>(null);
   const [ruleScope, setRuleScope] = useState<string | null>(null);
   const [openCount, setOpenCount] = useState(0);
+  const [retired, setRetired] = useState(0);
   const [review, setReview] = useState<{
     ats: string;
     payloadType: string;
     version: number;
   } | null>(null);
-  const openReview = (ats: string, payloadType: string, version: number) => {
+  const openReview = (
+    ats: string,
+    payloadType: string,
+    version: number,
+    retiredSamples = 0,
+  ) => {
     setReview({ ats, payloadType, version });
+    setRetired(retiredSamples);
     setScreen("Review");
   };
   useEffect(() => {
@@ -61,6 +68,7 @@ function App() {
         {...review}
         onDone={() => setScreen("Overview")}
         onApproved={afterApproval}
+        retired={retired}
       />
     ) : (
       <>

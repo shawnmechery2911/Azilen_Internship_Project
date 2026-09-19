@@ -498,6 +498,35 @@ class SamplePayloadStore(JsonBacked):
         del held[: max(0, len(held) - self.limit)]
         self._save()
 
+    def retire(self, ats: str, gone: str, arrived: str) -> int:
+        """Drop orders written in a shape this partner no longer sends.
+
+        After a rename, every stored order still carries the old path. A
+        mapping reading the new one fails replay against all of them, so the
+        guardrail blocks the very repair it exists to check - and the only way
+        through is to ignore it, which teaches people to ignore it.
+
+        Those orders describe a payload that will not arrive again, so they
+        are not evidence about a new mapping. An order already carrying the
+        new path is kept: the partner has begun sending it, and that is
+        exactly what the new mapping should be held to.
+
+        Returns how many were retired, so a caller can say so rather than
+        deleting quietly.
+        """
+        self._reload_if_changed()
+        held = self.samples.get(ats, [])
+        keep = [
+            payload
+            for payload in held
+            if get_path(payload, gone) is None or get_path(payload, arrived) is not None
+        ]
+        retired = len(held) - len(keep)
+        if retired:
+            self.samples[ats] = keep
+            self._save()
+        return retired
+
     def _save(self) -> None:
         with self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)

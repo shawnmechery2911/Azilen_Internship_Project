@@ -45,12 +45,14 @@ export function MappingReviewScreen({
   version,
   onDone,
   onApproved,
+  retired = 0,
 }: {
   ats: string;
   payloadType: string;
   version: number;
   onDone: () => void;
   onApproved?: (ats: string) => void;
+  retired?: number;
 }) {
   const [mapping, setMapping] = useState<MappingVersion | null>(null);
   const [replay, setReplay] = useState<ReplayResult | null>(null);
@@ -307,6 +309,16 @@ export function MappingReviewScreen({
 
       {error && <div className="toast">{error}</div>}
 
+      {retired > 0 && (
+        <div className="filter-note">
+          <span>
+            {retired} stored order{retired === 1 ? "" : "s"} written in the old
+            shape {retired === 1 ? "was" : "were"} retired - {retired === 1 ? "it" : "they"}{" "}
+            cannot arrive again, so replay no longer holds this mapping to{" "}
+            {retired === 1 ? "it" : "them"}.
+          </span>
+        </div>
+      )}
       <section className={`verdict verdict-${verdict.tone}`}>
         <strong>{verdict.head}</strong>
         <span>{verdict.detail}</span>

@@ -190,7 +190,7 @@ export function remapSource(
   payloadType: string,
   fromSource: string,
   toSource: string,
-): Promise<{ version: number }> {
+): Promise<{ version: number; retired_samples: number }> {
   return request(`/mappings/${ats}/${payloadType}/remap`, {
     method: "POST",
     body: JSON.stringify({ from_source: fromSource, to_source: toSource }),
