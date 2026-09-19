@@ -273,10 +273,12 @@ export function MappingReviewScreen({
             .map((rule, index) => {
             const example = sample ? valueAt(sample, rule.source) : null;
             const source = describeSource(rule.source);
-            const wasRule = diff.changed.get(rule.destination);
-            const isNew = diff.added.has(rule.destination);
+            const wasRule = previous ? diff.changed.get(rule.destination) : undefined;
+            const isNew = Boolean(previous) && diff.added.has(rule.destination);
             const notes = [
-              rule.transform ? `transform: ${rule.transform}` : null,
+              rule.transform && rule.transform !== "identity"
+                ? `transform: ${rule.transform}`
+                : null,
               rule.source_is_list ? "list" : null,
               rule.required ? "required" : null,
             ].filter(Boolean);
