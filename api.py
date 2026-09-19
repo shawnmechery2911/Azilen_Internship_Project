@@ -50,6 +50,27 @@ class ParseRequest(BaseModel):
     text: str
 
 
+class MappingEdit(BaseModel):
+    destination: str
+    source: str | None = None
+    required: bool | None = None
+    transform: str | None = None
+    remove: bool = False
+    edited_by: str = ""
+
+
+def leaf_paths(node, prefix: str = "") -> list[str]:
+    """Every path a value can be read from in a stored payload."""
+    if isinstance(node, list):
+        return leaf_paths(node[0], prefix) if node else ([prefix] if prefix else [])
+    if isinstance(node, dict):
+        found: list[str] = []
+        for key, value in node.items():
+            found.extend(leaf_paths(value, f"{prefix}.{key}" if prefix else key))
+        return found
+    return [prefix] if prefix else []
+
+
 @app.post("/api/parse")
 def parse_payload(body: ParseRequest):
     try:
@@ -99,6 +120,41 @@ def replay_label(ats: str, index: int) -> str:
     if not samples.for_ats(ats) and index < len(names):
         return names[index]
     return f"stored order {index + 1}"
+
+
+@app.get("/api/partners/{ats}/source-fields")
+def partner_source_fields(ats: str):
+    """The paths this partner's own payloads actually contain.
+
+    A reviewer correcting a mapping should be choosing from what the partner
+    sends, not typing a path from memory.
+    """
+    seen: list[str] = []
+    for payload in replay_payloads_for(ats):
+        for path in leaf_paths(payload):
+            if path not in seen:
+                seen.append(path)
+    return sorted(seen)
+
+
+@app.patch("/api/mappings/{ats}/{payload_type}/{version}/mapping")
+def edit_draft_mapping(ats: str, payload_type: str, version: int, body: MappingEdit):
+    """Correct one row of a draft before it is approved."""
+    try:
+        draft = store.edit_draft(
+            ats,
+            payload_type,
+            version,
+            body.destination,
+            source=body.source,
+            required=body.required,
+            transform=body.transform,
+            remove=body.remove,
+            edited_by=body.edited_by,
+        )
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    return asdict(draft)
 
 
 @app.get("/api/partners")

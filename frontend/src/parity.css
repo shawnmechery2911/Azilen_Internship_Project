@@ -1126,3 +1126,55 @@ button.row:hover .row-action {
   color: var(--muted-2);
   text-decoration: line-through;
 }
+
+/* --- correcting a draft row -------------------------------------------------
+   A reviewer who spots a wrong source fixes it here rather than rejecting the
+   whole mapping and re-running the model.
+   --------------------------------------------------------------------------- */
+.map-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 10px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.map-line:hover .map-actions,
+.map-actions:focus-within {
+  opacity: 1;
+}
+.map-actions .link-button {
+  margin-left: 0;
+  font-size: var(--fs-label);
+}
+.link-danger {
+  color: var(--red);
+}
+.link-danger:hover {
+  color: var(--red);
+  text-decoration: underline;
+}
+.map-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.map-edit input {
+  width: 230px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+}
+.map-edit .secondary-button {
+  padding: 5px 12px;
+  font-size: var(--fs-label);
+}
+.map-edit .link-button {
+  margin-left: 0;
+  font-size: var(--fs-label);
+}

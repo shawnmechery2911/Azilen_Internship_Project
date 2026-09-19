@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   type FieldMapping,
   approveMapping,
+  editDraftMapping,
   getDestinationFields,
+  getPartnerSourceFields,
   getFixtures,
   getReplay,
   getVersions,
@@ -54,6 +56,10 @@ export function MappingReviewScreen({
   const [previous, setPrevious] = useState<MappingVersion | null>(null);
   const [onlyChanges, setOnlyChanges] = useState(false);
   const [reviewer, setReviewer] = useState("");
+  const [sourceFields, setSourceFields] = useState<string[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftSource, setDraftSource] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -65,6 +71,7 @@ export function MappingReviewScreen({
         getDestinationFields(),
         getFixtures(),
       ]);
+      getPartnerSourceFields(ats).then(setSourceFields).catch(() => setSourceFields([]));
       setMapping(versions.find((item) => item.version === version) ?? null);
       // the version immediately before this one is what a reviewer is
       // approving a change against
@@ -112,6 +119,29 @@ export function MappingReviewScreen({
   }, [mapping, previous]);
 
   const changeCount = diff.added.size + diff.changed.size + diff.removed.length;
+
+  function startEdit(destination: string, current: string) {
+    setEditing(destination);
+    setDraftSource(current);
+  }
+
+  async function saveEdit(destination: string, remove = false) {
+    setSaving(true);
+    setError("");
+    try {
+      await editDraftMapping(ats, payloadType, version, {
+        destination,
+        ...(remove ? { remove: true } : { source: draftSource }),
+        edited_by: reviewer.trim() || "reviewer",
+      });
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save that change");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function approve() {
     setBusy(true);
@@ -179,8 +209,43 @@ export function MappingReviewScreen({
           ? "The proposer cannot approve their own mapping"
           : "";
 
+  /** A draft can be corrected; an approved version is history. */
+  const canEdit = mapping.status === "draft";
+
+  function sourcePicker(destination: string) {
+    return (
+      <span className="map-edit">
+        <label className="sr-only" htmlFor={`src-${destination}`}>
+          Source field for {destination}
+        </label>
+        <input
+          id={`src-${destination}`}
+          list="partner-source-fields"
+          value={draftSource}
+          onChange={(event) => setDraftSource(event.target.value)}
+          placeholder="Person.Email or Static:value"
+        />
+        <button
+          className="secondary-button"
+          disabled={saving || !draftSource.trim()}
+          onClick={() => void saveEdit(destination)}
+        >
+          Save
+        </button>
+        <button className="link-button" onClick={() => setEditing(null)}>
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
   return (
     <div className="page-wrap">
+      <datalist id="partner-source-fields">
+        {sourceFields.map((path) => (
+          <option key={path} value={path} />
+        ))}
+      </datalist>
       <section className="page-heading">
         <div>
           <button className="back-link" onClick={onDone}>
@@ -191,6 +256,9 @@ export function MappingReviewScreen({
           </h1>
           <p>
             {payloadType} · proposed by {mapping.proposed_by}
+            {mapping.edited_by?.length
+              ? ` · edited by ${mapping.edited_by.join(", ")}`
+              : ""}
           </p>
         </div>
       </section>
@@ -288,10 +356,33 @@ export function MappingReviewScreen({
                 key={`${rule.destination}-${index}`}
               >
                 <span className="map-src">
-                  <code>{source.text}</code>
-                  {source.constant && <em className="map-const">constant</em>}
-                  {isNew && <em className="map-tag map-tag-new">new</em>}
-                  {wasRule && <em className="map-tag map-tag-changed">changed</em>}
+                  {editing === rule.destination ? (
+                    sourcePicker(rule.destination)
+                  ) : (
+                    <>
+                      <code>{source.text}</code>
+                      {source.constant && <em className="map-const">constant</em>}
+                      {isNew && <em className="map-tag map-tag-new">new</em>}
+                      {wasRule && <em className="map-tag map-tag-changed">changed</em>}
+                      {canEdit && (
+                        <span className="map-actions">
+                          <button
+                            className="link-button"
+                            onClick={() => startEdit(rule.destination, rule.source)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="link-button link-danger"
+                            disabled={saving}
+                            onClick={() => void saveEdit(rule.destination, true)}
+                          >
+                            Unmap
+                          </button>
+                        </span>
+                      )}
+                    </>
+                  )}
                 </span>
                 <span className="map-arrow" aria-hidden="true">
                   →
@@ -347,6 +438,17 @@ export function MappingReviewScreen({
               <div className="map-row" key={`${item.destination}-${index}`}>
                 <code className="map-dest">{item.destination}</code>
                 <span className="map-reason">{item.reason}</span>
+                {canEdit &&
+                  (editing === item.destination ? (
+                    sourcePicker(item.destination)
+                  ) : (
+                    <button
+                      className="link-button"
+                      onClick={() => startEdit(item.destination, "")}
+                    >
+                      Map it yourself
+                    </button>
+                  ))}
               </div>
             ))
           ) : (

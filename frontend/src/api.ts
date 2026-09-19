@@ -49,6 +49,7 @@ export interface MappingVersion {
   abstentions: Abstention[];
   status: string;
   proposed_by: string;
+  edited_by: string[];
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;
@@ -173,6 +174,27 @@ export function getValidationRules(ats?: string): Promise<ValidationRule[]> {
   return request<ValidationRule[]>(
     `/validation-rules${ats ? `?ats=${encodeURIComponent(ats)}` : ""}`,
   );
+}
+export function getPartnerSourceFields(ats: string): Promise<string[]> {
+  return request(`/partners/${ats}/source-fields`);
+}
+export function editDraftMapping(
+  ats: string,
+  payloadType: string,
+  version: number,
+  change: {
+    destination: string;
+    source?: string;
+    required?: boolean;
+    transform?: string;
+    remove?: boolean;
+    edited_by?: string;
+  },
+): Promise<MappingVersion> {
+  return request(`/mappings/${ats}/${payloadType}/${version}/mapping`, {
+    method: "PATCH",
+    body: JSON.stringify(change),
+  });
 }
 export function bindValidationRule(
   ats: string,

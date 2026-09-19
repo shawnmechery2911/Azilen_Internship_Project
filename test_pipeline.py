@@ -137,6 +137,51 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(len(kept), 3)
             self.assertEqual(kept, [{"n": 3}, {"n": 4}, {"n": 5}])
 
+    def test_a_draft_row_can_be_corrected_before_approval(self):
+        """The model proposed a defensible but wrong source; a reviewer fixes
+        it rather than rejecting the whole mapping."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [
+                FieldMapping("PartnerSystem", "Sender.Id"),
+            ], proposed_by="bedrock")
+            store.edit_draft("ats", "candidate", 1, "Sender.Id", source="Username", required=True, edited_by="ops-lead")
+            row = next(r for r in store.get("ats", "candidate", 1).mappings if r.destination == "Sender.Id")
+            self.assertEqual(row.source, "Username")
+            self.assertTrue(row.required)
+            self.assertEqual(store.get("ats", "candidate", 1).edited_by, ["ops-lead"])
+
+    def test_editing_a_draft_can_map_something_the_model_declined(self):
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [], proposed_by="bedrock",
+                            abstentions=[{"destination": "Applicant.SSN", "reason": "not present"}])
+            store.edit_draft("ats", "candidate", 1, "Applicant.SSN", source="Person.Ssn", edited_by="ops-lead")
+            draft = store.get("ats", "candidate", 1)
+            self.assertEqual([r.source for r in draft.mappings], ["Person.Ssn"])
+            self.assertEqual(draft.abstentions, [])
+
+    def test_a_row_can_be_removed_from_a_draft(self):
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [
+                FieldMapping("Username", "Applicant.PartnerReference1"),
+                FieldMapping("Person.Email", "Applicant.Email"),
+            ], proposed_by="bedrock")
+            store.edit_draft("ats", "candidate", 1, "Applicant.PartnerReference1", remove=True, edited_by="ops-lead")
+            left = [r.destination for r in store.get("ats", "candidate", 1).mappings]
+            self.assertEqual(left, ["Applicant.Email"])
+
+    def test_an_approved_mapping_cannot_be_edited_in_place(self):
+        """Production runs it and earlier orders were mapped with it, so a
+        change has to be a new version the guardrail can review."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("a", "A")], proposed_by="bedrock")
+            store.approve("ats", "candidate", 1, "reviewer")
+            with self.assertRaises(ValueError):
+                store.edit_draft("ats", "candidate", 1, "A", source="b", edited_by="ops-lead")
+
     def test_drift_requires_repeated_failures(self):
         with TemporaryDirectory() as folder:
             tracker = DriftTracker(threshold=2, path=Path(folder) / "drift.json")

@@ -215,6 +215,7 @@ class MappingVersion:
     abstentions: list[dict[str, str]] = field(default_factory=list)
     status: str = "draft"
     proposed_by: str = "system"
+    edited_by: list[str] = field(default_factory=list)
     approved_by: str | None = None
     approved_at: str | None = None
     created_at: str = field(default_factory=utc_now)
@@ -624,6 +625,56 @@ class MappingStore(JsonBacked):
         self._reload_if_changed()
         versions = [v.version for v in self._versions if v.ats == ats and v.payload_type == payload_type]
         return max(versions, default=0) + 1
+
+    def edit_draft(
+        self,
+        ats: str,
+        payload_type: str,
+        version: int,
+        destination: str,
+        source: str | None = None,
+        required: bool | None = None,
+        transform: str | None = None,
+        remove: bool = False,
+        edited_by: str = "",
+    ) -> MappingVersion:
+        """Correct one row of a draft before anyone approves it.
+
+        Only a draft. An approved version is what production runs and what
+        earlier orders were mapped with, so changing it in place would
+        silently rewrite history - a correction to an approved mapping is a
+        new version, which is what the replay guardrail and the diff exist
+        to review.
+
+        The destination is fixed; it is our schema. What a reviewer changes
+        is which of the partner's fields feeds it.
+        """
+        draft = self.get(ats, payload_type, version)
+        if draft is None:
+            raise ValueError(f"Mapping version {version} does not exist")
+        if draft.status != "draft":
+            raise ValueError("Only a draft can be edited; approved versions are immutable")
+
+        rows = [row for row in draft.mappings if row.destination != destination]
+        if not remove:
+            existing = next((row for row in draft.mappings if row.destination == destination), None)
+            base = existing or FieldMapping(source or "", destination)
+            rows.append(
+                replace_fields(
+                    base,
+                    source=source if source is not None else base.source,
+                    required=required if required is not None else base.required,
+                    transform=transform if transform is not None else base.transform,
+                    reason=f"set by {edited_by}" if edited_by else base.reason,
+                )
+            )
+        draft.mappings = rows
+        # a destination a human has now mapped is no longer one the model declined
+        draft.abstentions = [a for a in draft.abstentions if a.get("destination") != destination]
+        if edited_by and edited_by not in draft.edited_by:
+            draft.edited_by.append(edited_by)
+        self._save()
+        return draft
 
     def add_draft(
         self,
