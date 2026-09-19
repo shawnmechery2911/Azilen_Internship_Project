@@ -30,7 +30,7 @@
 .payload-label {
   display: flex;
   flex-direction: column;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-weight: 600;
   color: var(--text, var(--text));
   letter-spacing: 0.04em;
@@ -41,7 +41,7 @@
   text-transform: none;
   letter-spacing: 0;
   color: var(--muted, var(--muted));
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .payload-col pre {
   margin: 0;
@@ -52,7 +52,7 @@
   border-radius: 10px;
   background: var(--surface-3);
   border: 1px solid var(--line, var(--border-soft));
-  font-size: 12px;
+  font-size: var(--fs-meta);
   line-height: 1.55;
   color: var(--text-2);
   white-space: pre;
@@ -78,7 +78,7 @@
 }
 .payload-issues-head strong {
   color: var(--text, var(--text));
-  font-size: 13.5px;
+  font-size: var(--fs-body);
 }
 .payload-issues ul {
   margin: 0;
@@ -88,7 +88,7 @@
   gap: 5px;
 }
 .payload-issues li {
-  font-size: 12.5px;
+  font-size: var(--fs-meta);
   color: var(--muted, var(--muted));
 }
 .payload-issues li code {
@@ -105,7 +105,7 @@
   border: 1px solid var(--green-line);
   background: var(--green-soft);
   color: var(--green);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 .cost-panel {
   display: flex;
@@ -126,12 +126,12 @@
   min-width: 300px;
 }
 .cost-headline > strong {
-  font-size: 30px;
+  font-size: var(--fs-display);
   line-height: 1;
   color: var(--text, var(--text));
 }
 .cost-headline span {
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--muted, var(--muted));
   line-height: 1.5;
 }
@@ -148,13 +148,13 @@
   gap: 3px;
 }
 .cost-figures span {
-  font-size: 11px;
+  font-size: var(--fs-meta);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted, var(--muted));
 }
 .cost-figures strong {
-  font-size: 15px;
+  font-size: var(--fs-h3);
   color: var(--text, var(--text));
 }
 @media (max-width: 900px) {
@@ -186,7 +186,7 @@
   border-radius: 10px;
   border: 1px solid var(--line, var(--border));
   background: var(--surface-2);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--muted, var(--muted));
 }
 .issue-row code {
@@ -198,7 +198,7 @@
   justify-content: center;
   border-radius: 999px;
   padding: 4px 8px;
-  font-size: 10px;
+  font-size: var(--fs-label);
   line-height: 1;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -219,11 +219,11 @@
   margin-bottom: 12px;
 }
 .result-banner strong {
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .result-banner span {
   color: var(--muted, var(--muted));
-  font-size: 12px;
+  font-size: var(--fs-meta);
 }
 .result-processed {
   background: var(--green-soft);
@@ -250,14 +250,14 @@
 }
 .rules-header {
   color: var(--muted, var(--muted));
-  font-size: 11px;
+  font-size: var(--fs-label);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--line, var(--border));
 }
 .rules-row {
   border-bottom: 1px solid var(--line, var(--border-soft));
-  font-size: 12px;
+  font-size: var(--fs-meta);
   color: var(--text, var(--text));
 }
 .rules-row code {
@@ -271,4 +271,288 @@
   margin-top: 3px;
   color: var(--muted-2, var(--muted-2));
   font-family: var(--mono, monospace);
+}
+/* ---------------------------------------------------------------------------
+   Styles for class names the screens use that had no rule at all, so those
+   elements rendered unstyled - rows ran together and the runtime panel had no
+   shape. Same tokens as everything else, so both themes follow.
+   --------------------------------------------------------------------------- */
+
+.screen-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--muted);
+  font-size: var(--fs-body);
+}
+.screen-state strong {
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.screen-state p {
+  margin: 0;
+}
+
+.mapping-list-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 11px 0;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-size: var(--fs-body);
+}
+.mapping-list-row:first-of-type {
+  border-top: 0;
+}
+button.mapping-list-row:hover {
+  background: var(--surface-2);
+}
+.mapping-list-row strong {
+  flex: 0 0 auto;
+  min-width: 118px;
+  color: var(--text);
+  font-weight: 600;
+}
+.mapping-list-row span {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted-2);
+  font-size: var(--fs-meta);
+}
+.mapping-list-row em {
+  flex: 0 0 auto;
+  color: var(--muted-3);
+  font-style: normal;
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+}
+
+.mapping-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border-soft);
+  font-size: var(--fs-body);
+}
+.mapping-rule:first-of-type {
+  border-top: 0;
+}
+.mapping-rule strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.mapping-rule span {
+  color: var(--muted-2);
+  font-size: var(--fs-meta);
+}
+.mapping-rule.abstention strong {
+  color: var(--amber);
+}
+
+.process-panel {
+  margin-bottom: 18px;
+}
+.process-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+.process-controls select {
+  flex: 0 1 320px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.process-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: var(--fs-body);
+  color: var(--muted);
+}
+.process-result > strong {
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+
+.status-pill {
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.warning-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: var(--fs-body);
+}
+
+.exception-list {
+  display: flex;
+  flex-direction: column;
+}
+.exception-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.exception-actions input,
+.reviewer-input {
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.exception-actions input {
+  width: 190px;
+}
+.reviewer-input {
+  display: block;
+  width: 220px;
+  margin: 14px 0 10px;
+}
+
+.onboarding-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.onboarding-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 440px;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+.onboarding-form label small {
+  color: var(--green);
+  font-size: var(--fs-label);
+}
+.onboarding-form input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-body);
+}
+.onboarding-form input[type="file"] {
+  padding: 8px;
+  color: var(--muted);
+  font-size: var(--fs-meta);
+}
+.onboarding-form pre {
+  width: 100%;
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
+
+/* --- switch -----------------------------------------------------------------
+   A real checkbox, visually a toggle: the input keeps its own semantics and
+   keyboard behaviour, and the track is drawn from it. Nothing here is a div
+   pretending to be a control.
+   --------------------------------------------------------------------------- */
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 20px;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.switch .track {
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--border-strong, var(--border));
+  transition: background 0.16s ease;
+  pointer-events: none;
+}
+.switch .thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: transform 0.16s ease;
+  pointer-events: none;
+}
+.switch input:checked ~ .track {
+  background: var(--accent);
+}
+.switch input:checked ~ .thumb {
+  transform: translateX(14px);
+}
+.switch input:focus-visible ~ .track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.switch input:disabled ~ .track {
+  opacity: 0.5;
+}
+.switch input:disabled {
+  cursor: default;
+}
+.rules-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rules-cell small {
+  color: var(--green);
+  font-size: var(--fs-label);
+  font-weight: 600;
 }
