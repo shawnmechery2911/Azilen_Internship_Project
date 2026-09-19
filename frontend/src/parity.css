@@ -895,3 +895,80 @@ button.row-link:hover .row-action {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* --- onboarding steps -------------------------------------------------------
+   Three numbered steps rather than one flat form, because the order matters:
+   name the partner, give it a sample, then let the model read it.
+   --------------------------------------------------------------------------- */
+.step {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.step-mark {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  font-weight: 700;
+}
+.step-body {
+  flex: 1;
+  min-width: 0;
+}
+.step-body > h2 {
+  margin: 4px 0 12px;
+}
+.step-fields {
+  flex-direction: row;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.step-fields label {
+  max-width: 240px;
+}
+.step-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.parse-result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--green-line);
+  border-radius: 8px;
+  background: var(--green-soft);
+}
+.parse-summary {
+  color: var(--green);
+  font-size: var(--fs-meta);
+}
+.parse-summary strong {
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+}
+.parse-result pre {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+}
