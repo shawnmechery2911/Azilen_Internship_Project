@@ -158,7 +158,7 @@
 .tag-format { background: var(--teal-soft); color: var(--teal); }
 .tag-business { background: var(--violet-soft); color: var(--violet); }
 .tag-completeness { background: var(--amber-soft); color: var(--amber); }
-.result-banner {
+.banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -168,18 +168,18 @@
   border: 1px solid var(--line, var(--border));
   margin-bottom: 12px;
 }
-.result-banner strong {
+.banner strong {
   font-size: var(--fs-body);
 }
-.result-banner span {
+.banner span {
   color: var(--muted, var(--muted));
   font-size: var(--fs-meta);
 }
-.result-processed {
+.banner-processed {
   background: var(--green-soft);
   border-color: var(--green-line);
 }
-.result-exception {
+.banner-exception {
   background: var(--red-soft);
   border-color: var(--red-line);
 }
