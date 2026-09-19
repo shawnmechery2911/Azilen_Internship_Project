@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   assignException,
   closeException,
@@ -8,6 +8,17 @@ import {
 import { ErrorPanel, Loading, EmptyState } from "../components/ScreenState";
 import { IssueList } from "../components/IssueList";
 
+function since(iso: string): string {
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (!Number.isFinite(seconds)) return "";
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 export function ExceptionsScreen({ ats }: { ats?: string | null }) {
   const [records, setRecords] = useState<ExceptionRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,6 +26,9 @@ export function ExceptionsScreen({ ats }: { ats?: string | null }) {
   const [owners, setOwners] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [state, setState] = useState<"open" | "closed" | "all">("open");
+  const [payloadOpen, setPayloadOpen] = useState<string | null>(null);
+
   async function load() {
     setLoading(true);
     setError("");
@@ -29,6 +43,7 @@ export function ExceptionsScreen({ ats }: { ats?: string | null }) {
   useEffect(() => {
     void load();
   }, []);
+
   async function act(id: string, action: () => Promise<ExceptionRecord>) {
     setBusy(id);
     setError("");
@@ -41,6 +56,24 @@ export function ExceptionsScreen({ ats }: { ats?: string | null }) {
       setBusy("");
     }
   }
+
+  const forPartner = useMemo(
+    () => (ats && !showAll ? records.filter((r) => r.ats === ats) : records),
+    [records, ats, showAll],
+  );
+  const counts = useMemo(
+    () => ({
+      open: forPartner.filter((r) => r.status === "open").length,
+      closed: forPartner.filter((r) => r.status === "closed").length,
+      all: forPartner.length,
+    }),
+    [forPartner],
+  );
+  const visible = useMemo(
+    () => (state === "all" ? forPartner : forPartner.filter((r) => r.status === state)),
+    [forPartner, state],
+  );
+
   if (loading)
     return (
       <div className="page-wrap">
@@ -53,16 +86,7 @@ export function ExceptionsScreen({ ats }: { ats?: string | null }) {
         <ErrorPanel message={error} retry={() => void load()} />
       </div>
     );
-  if (!records.length)
-    return (
-      <div className="page-wrap">
-        <div className="panel">
-          <EmptyState label="No exceptions available." />
-        </div>
-      </div>
-    );
-  const visible =
-    ats && !showAll ? records.filter((item) => item.ats === ats) : records;
+
   return (
     <div className="page-wrap">
       <section className="page-heading">
@@ -71,68 +95,131 @@ export function ExceptionsScreen({ ats }: { ats?: string | null }) {
           <h1>Exception queue</h1>
         </div>
       </section>
-      {ats && (
+
+      {ats && !showAll && (
         <div className="filter-note">
           <span>
             Showing <strong>{ats}</strong> only
           </span>
-          <a href="#all" onClick={() => setShowAll(true)}>
+          <button className="link-button" onClick={() => setShowAll(true)}>
             Show every partner
-          </a>
+          </button>
         </div>
       )}
       {error && <div className="toast">{error}</div>}
-      <section className="panel exception-list">
-        {visible.map((record) => (
-          <article className="mapping-rule" key={record.id}>
-            <strong>
-              {record.ats} / {record.payload_type} · {record.status}
-            </strong>
-            <span>
-              v{record.mapping_version ?? "-"} ·{" "}
-              {new Date(record.created_at).toLocaleString()} ·{" "}
-              {record.owner ? `Owner: ${record.owner}` : "Unassigned"}
-            </span>
-            <IssueList issues={record.issues} />
-            <div className="exception-actions">
-              <input
-                placeholder="Owner name"
-                value={owners[record.id] ?? ""}
-                onChange={(event) =>
-                  setOwners((current) => ({
-                    ...current,
-                    [record.id]: event.target.value,
-                  }))
-                }
-              />
-              <button
-                className="secondary-button"
-                disabled={
-                  busy === record.id || !(owners[record.id] ?? "").trim()
-                }
-                onClick={() =>
-                  void act(record.id, () =>
-                    assignException(record.id, owners[record.id] ?? ""),
-                  )
-                }
-              >
-                Assign
-              </button>
-              {record.status === "open" && (
+
+      <div className="filter-group filter-row">
+        {(["open", "closed", "all"] as const).map((option) => (
+          <button
+            key={option}
+            className={state === option ? "filter-active" : ""}
+            onClick={() => setState(option)}
+          >
+            {option} ({counts[option]})
+          </button>
+        ))}
+      </div>
+
+      {visible.length ? (
+        <div className="exception-list">
+          {visible.map((record) => (
+            <article className="exception-card" key={record.id}>
+              <header className="exception-head">
+                <strong>{record.ats}</strong>
+                <span className="exception-type">{record.payload_type}</span>
+                <span
+                  className={`status ${record.status === "open" ? "status-exception" : "status-processed"}`}
+                >
+                  {record.status}
+                </span>
+                <span className="exception-spacer" />
+                <code className="row-meta">v{record.mapping_version ?? "-"}</code>
+                <span className="row-time">{since(record.created_at)}</span>
+              </header>
+
+              <IssueList issues={record.issues} />
+
+              <footer className="exception-foot">
+                <span className="exception-owner">
+                  {record.owner ? (
+                    <>
+                      Owned by <strong>{record.owner}</strong>
+                    </>
+                  ) : (
+                    "Unassigned"
+                  )}
+                </span>
+
+                {record.status === "open" && (
+                  <div className="exception-actions">
+                    <label className="sr-only" htmlFor={`owner-${record.id}`}>
+                      Owner name
+                    </label>
+                    <input
+                      id={`owner-${record.id}`}
+                      placeholder="Owner name"
+                      value={owners[record.id] ?? ""}
+                      onChange={(event) =>
+                        setOwners((current) => ({
+                          ...current,
+                          [record.id]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      className="secondary-button"
+                      disabled={
+                        busy === record.id || !(owners[record.id] ?? "").trim()
+                      }
+                      onClick={() =>
+                        void act(record.id, () =>
+                          assignException(record.id, owners[record.id] ?? ""),
+                        )
+                      }
+                    >
+                      Assign
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={busy === record.id}
+                      onClick={() =>
+                        void act(record.id, () => closeException(record.id))
+                      }
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+
                 <button
-                  className="primary-button"
-                  disabled={busy === record.id}
+                  className="link-button"
                   onClick={() =>
-                    void act(record.id, () => closeException(record.id))
+                    setPayloadOpen(payloadOpen === record.id ? null : record.id)
                   }
                 >
-                  Close
+                  {payloadOpen === record.id ? "Hide payload" : "View payload"}
                 </button>
+              </footer>
+
+              {payloadOpen === record.id && (
+                <pre className="exception-payload">
+                  {JSON.stringify(record.payload, null, 2)}
+                </pre>
               )}
-            </div>
-          </article>
-        ))}
-      </section>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="panel">
+          <EmptyState
+            label={
+              state === "open"
+                ? "Nothing open. Every exception here has been dealt with."
+                : `No ${state} exceptions.`
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }
