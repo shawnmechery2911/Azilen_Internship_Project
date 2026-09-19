@@ -128,27 +128,35 @@ export function RulesScreen() {
                     )}
                   </span>
                   <span>{rule.ats ?? "all"}</span>
-                  <div>
-                    <input
-                      type="checkbox"
-                      aria-label={`${rule.field} required`}
-                      checked={rule.required}
-                      disabled={busy === rule.id}
-                      onChange={(event) =>
-                        void toggle(rule, { required: event.target.checked })
-                      }
-                    />
+                  <div className="rules-cell">
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        aria-label={`${rule.field} must be present`}
+                        checked={rule.required}
+                        disabled={busy === rule.id}
+                        onChange={(event) =>
+                          void toggle(rule, { required: event.target.checked })
+                        }
+                      />
+                      <span className="track" />
+                      <span className="thumb" />
+                    </label>
                     {savedRule === rule.id && <small>Saved</small>}
                   </div>
-                  <input
-                    type="checkbox"
-                    aria-label={`${rule.field} enabled`}
-                    checked={rule.enabled}
-                    disabled={busy === rule.id}
-                    onChange={(event) =>
-                      void toggle(rule, { enabled: event.target.checked })
-                    }
-                  />
+                  <label className="switch">
+                    <input
+                      type="checkbox"
+                      aria-label={`${rule.field} rule active`}
+                      checked={rule.enabled}
+                      disabled={busy === rule.id}
+                      onChange={(event) =>
+                        void toggle(rule, { enabled: event.target.checked })
+                      }
+                    />
+                    <span className="track" />
+                    <span className="thumb" />
+                  </label>
                 </div>
               ))}
             </div>
