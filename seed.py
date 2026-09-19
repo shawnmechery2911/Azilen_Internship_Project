@@ -33,6 +33,15 @@ DEFAULT_RULES = [
     ValidationRule("dob_required_vsys", "Applicant.DateOfBirth", "Completeness", "vsys always sends a date of birth", required=True, ats="vsys"),
     ValidationRule("phone_required_vsys", "Applicant.PhoneNumber", "Completeness", "vsys always sends a phone number", required=True, ats="vsys"),
     ValidationRule("city_required_vsys", "Applicant.Addresses.City", "Completeness", "vsys always sends an address history", required=True, ats="vsys"),
+    # Every remaining destination field, so all 18 appear on the Validation
+    # screen and presence can be demanded per partner with a toggle. They ship
+    # not-required because no current partner sends them - switching one on
+    # without the partner sending it would fail every order for that partner.
+    ValidationRule("method_name_present", "MethodName", "Completeness", "the request method name"),
+    ValidationRule("transact_id_present", "TransactInfo.TransactId", "Completeness", "the partner's transaction id"),
+    ValidationRule("partner_ref_present", "Applicant.PartnerReference1", "Completeness", "the partner's own reference"),
+    ValidationRule("middle_name_present", "Applicant.Names[0].MiddleName", "Completeness", "the applicant's middle name"),
+    ValidationRule("suffix_present", "Applicant.Names[0].Suffix", "Completeness", "the applicant's name suffix"),
 ]
 
 
@@ -45,12 +54,18 @@ def seed() -> None:
     exceptions_path = ROOT / "exceptions.json"
     activity_path = ROOT / "processing_log.json"
     rules_path = ROOT / "validation_rules.json"
-    if store_path.exists() and exceptions_path.exists() and activity_path.exists() and rules_path.exists():
-        return
-
+    # Rules are topped up even on an already-seeded install: a new default rule
+    # should reach an existing demo without wiping the toggles someone set.
+    # Matching is by id, so an edited rule is left exactly as it is.
     rules = ValidationRuleStore(rules_path)
-    if not rules.all():
-        rules.replace_all(DEFAULT_RULES)
+    known = {rule.id for rule in rules.all()}
+    added = [rule for rule in DEFAULT_RULES if rule.id not in known]
+    if added:
+        rules.replace_all(rules.all() + added)
+        print(f"added {len(added)} new validation rule(s): {', '.join(rule.id for rule in added)}")
+
+    if store_path.exists() and exceptions_path.exists() and activity_path.exists():
+        return
 
     store = MappingStore(store_path)
     ideal_rows = [
