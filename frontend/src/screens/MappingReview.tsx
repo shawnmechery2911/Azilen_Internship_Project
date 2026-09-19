@@ -12,7 +12,9 @@ import {
   type MappingVersion,
   type ReplayResult,
 } from "../api";
+import { Link2Off } from "lucide-react";
 import { EmptyState, ErrorPanel, Loading } from "../components/ScreenState";
+import { EditIcon } from "../components/EditIcon";
 
 /** Static:1.0 is storage syntax; a reviewer should see a constant. */
 function describeSource(source: string): { text: string; constant: boolean } {
@@ -330,6 +332,7 @@ export function MappingReviewScreen({
             <span />
             <span>we store it as</span>
             <span>example</span>
+            <span />
           </div>
           {mapping.mappings
             .filter(
@@ -364,23 +367,6 @@ export function MappingReviewScreen({
                       {source.constant && <em className="map-const">constant</em>}
                       {isNew && <em className="map-tag map-tag-new">new</em>}
                       {wasRule && <em className="map-tag map-tag-changed">changed</em>}
-                      {canEdit && (
-                        <span className="map-actions">
-                          <button
-                            className="link-button"
-                            onClick={() => startEdit(rule.destination, rule.source)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="link-button link-danger"
-                            disabled={saving}
-                            onClick={() => void saveEdit(rule.destination, true)}
-                          >
-                            Unmap
-                          </button>
-                        </span>
-                      )}
                     </>
                   )}
                 </span>
@@ -390,6 +376,29 @@ export function MappingReviewScreen({
                 <code className="map-dest">{rule.destination}</code>
                 <span className="map-sample">
                   {source.constant ? "" : (example ?? "—")}
+                </span>
+                <span className="map-actions">
+                  {canEdit && editing !== rule.destination && (
+                    <>
+                      <button
+                        className="icon-action"
+                        title="Change which field feeds this"
+                        aria-label={`Change the source for ${rule.destination}`}
+                        onClick={() => startEdit(rule.destination, rule.source)}
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        className="icon-action icon-danger"
+                        title="Remove this mapping"
+                        aria-label={`Unmap ${rule.destination}`}
+                        disabled={saving}
+                        onClick={() => void saveEdit(rule.destination, true)}
+                      >
+                        <Link2Off size={14} />
+                      </button>
+                    </>
+                  )}
                 </span>
                 {wasRule && (
                   <span className="map-note map-was">

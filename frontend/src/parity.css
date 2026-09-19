@@ -1004,7 +1004,7 @@ button.row:hover .row-action {
 .map-head,
 .map-line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1.15fr) 190px;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1.15fr) 170px 58px;
   align-items: baseline;
   gap: 10px;
   padding: 9px 0;
@@ -1134,18 +1134,29 @@ button.row:hover .row-action {
 .map-actions {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  margin-left: 10px;
-  opacity: 0;
-  transition: opacity 0.12s ease;
+  justify-content: flex-end;
+  gap: 6px;
 }
-.map-line:hover .map-actions,
-.map-actions:focus-within {
-  opacity: 1;
+.icon-action {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted-2);
 }
-.map-actions .link-button {
-  margin-left: 0;
-  font-size: var(--fs-label);
+.icon-action:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.icon-action.icon-danger:hover {
+  color: var(--red);
+}
+.icon-action:disabled {
+  opacity: 0.4;
 }
 .link-danger {
   color: var(--red);
