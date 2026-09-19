@@ -111,7 +111,10 @@ class BedrockProposer:
             modelId=self.model_id,
             system=[{"text": SYSTEM_PROMPT}],
             messages=[{"role": "user", "content": [{"text": user_message}]}],
-            inferenceConfig={"temperature": 0, "maxTokens": 4096},
+            # temperature is deprecated on the newer Anthropic models and they
+            # reject the request outright if it is sent. Forced tool use already
+            # pins the shape of the output, which is what temperature 0 was for.
+            inferenceConfig={"maxTokens": 4096},
             toolConfig={"tools": [MAPPING_TOOL], "toolChoice": {"tool": {"name": "propose_mapping"}}},
         )
         self.last_usage = response.get("usage")
