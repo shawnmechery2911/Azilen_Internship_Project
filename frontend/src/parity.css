@@ -192,7 +192,7 @@
 .rules-header,
 .rules-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) 128px 108px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) 148px;
   gap: 12px;
   align-items: center;
   min-width: 700px;

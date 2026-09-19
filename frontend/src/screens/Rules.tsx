@@ -91,9 +91,9 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
           <div className="eyebrow">Configuration</div>
           <h1>Validation rules</h1>
           <p>
-            Enabled — check this rule at all. Required — the field must be present.
-            A rule can be enabled but not required, which means: if the value is
-            there it must be valid, but it is allowed to be missing.
+            Completeness rules decide whether a field has to be there. Format
+            and Business rules check a value whenever one is present, so they
+            cost nothing to leave on.
           </p>
         </div>
       </section>
@@ -138,8 +138,9 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
               <div className="rules-header">
                 <span>Field</span>
                 <span>Check</span>
-                <span>Must be present</span>
-                <span>Rule active</span>
+                <span>
+                  {group === "Completeness" ? "Must be present" : "Rule active"}
+                </span>
               </div>
               {inGroup.map((rule) => (
                 <div
@@ -155,14 +156,30 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
                     )}
                   </span>
                   <div className="rules-cell">
+                    {/* Presence is the whole of a Completeness rule, so one
+                        switch says everything. For a Format or Business rule
+                        presence is beside the point - the shape check runs
+                        whenever a value is there - so its switch turns the
+                        check itself on and off. */}
                     <label className="switch">
                       <input
                         type="checkbox"
-                        aria-label={`${rule.field} must be present`}
-                        checked={rule.required}
+                        aria-label={
+                          group === "Completeness"
+                            ? `${rule.field} must be present`
+                            : `${rule.field} rule active`
+                        }
+                        checked={
+                          group === "Completeness" ? rule.required : rule.enabled
+                        }
                         disabled={busy === rule.id}
                         onChange={(event) =>
-                          void toggle(rule, { required: event.target.checked })
+                          void toggle(
+                            rule,
+                            group === "Completeness"
+                              ? { required: event.target.checked }
+                              : { enabled: event.target.checked },
+                          )
                         }
                       />
                       <span className="track" />
@@ -170,19 +187,6 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
                     </label>
                     {savedRule === rule.id && <small>Saved</small>}
                   </div>
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      aria-label={`${rule.field} rule active`}
-                      checked={rule.enabled}
-                      disabled={busy === rule.id}
-                      onChange={(event) =>
-                        void toggle(rule, { enabled: event.target.checked })
-                      }
-                    />
-                    <span className="track" />
-                    <span className="thumb" />
-                  </label>
                 </div>
               ))}
             </div>
