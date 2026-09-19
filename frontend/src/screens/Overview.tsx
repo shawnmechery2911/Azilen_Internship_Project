@@ -87,9 +87,6 @@ export function OverviewScreen({
         <div>
           <div className="eyebrow">{new Date().toLocaleDateString()}</div>
           <h1>Pipeline overview</h1>
-          <p>
-            Deterministic runtime health and human-controlled mapping changes.
-          </p>
         </div>
         <button
           className="primary-button"

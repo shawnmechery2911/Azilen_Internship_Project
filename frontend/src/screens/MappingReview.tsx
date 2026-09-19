@@ -75,9 +75,7 @@ export function MappingReviewScreen({
           <h1>
             {ats} / {payloadType} / v{version}
           </h1>
-          <p>
-            Proposed by {mapping.proposed_by}. Approval is the production gate.
-          </p>
+          <p>Proposed by {mapping.proposed_by}</p>
         </div>
       </section>
       {error && <div className="toast">{error}</div>}

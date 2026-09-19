@@ -63,7 +63,6 @@ export function MappingsScreen({
         <div>
           <div className="eyebrow">Configuration</div>
           <h1>Mappings</h1>
-          <p>Review every version before it reaches production.</p>
         </div>
       </section>
       <div className="content-grid">

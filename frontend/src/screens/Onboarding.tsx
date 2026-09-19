@@ -61,10 +61,6 @@ export function OnboardingScreen({
         <div>
           <div className="eyebrow">Partner onboarding</div>
           <h1>Draft a mapping</h1>
-          <p>
-            AI is used only here to propose a mapping. You approve what reaches
-            runtime.
-          </p>
         </div>
       </section>
       {error && <ErrorPanel message={error} retry={() => void draft()} />}
@@ -97,21 +93,12 @@ export function OnboardingScreen({
           {fileName && <small>Parsed: {fileName}</small>}
         </label>
         {file && <pre>{JSON.stringify(file, null, 2)}</pre>}
-        <label>
-          Destination fields
-          <textarea
-            value={fields}
-            onChange={(event) => setFields(event.target.value)}
-          />
-        </label>
         <button
           className="primary-button"
           disabled={!file || !ats.trim() || busy}
           onClick={() => void draft()}
         >
-          {busy
-            ? "AI is drafting, this may take a few seconds..."
-            : "Draft mapping"}
+          {busy ? "Drafting..." : "Draft mapping"}
         </button>
       </div>
     </div>

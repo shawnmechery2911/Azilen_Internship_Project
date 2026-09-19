@@ -64,7 +64,6 @@ export function ExceptionsScreen() {
         <div>
           <div className="eyebrow">Operations</div>
           <h1>Exception queue</h1>
-          <p>Failures are owned, investigated, and closed.</p>
         </div>
       </section>
       {error && <div className="toast">{error}</div>}
