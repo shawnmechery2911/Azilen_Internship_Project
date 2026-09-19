@@ -21,6 +21,7 @@ exceptions.json
 processing_log.json
 ai_usage.json
 validation_rules.json
+drift_counts.json
 *.log
 
 demo-data/
