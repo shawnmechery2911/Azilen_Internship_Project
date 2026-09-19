@@ -22,6 +22,8 @@ processing_log.json
 ai_usage.json
 validation_rules.json
 drift_counts.json
+rule_bindings.json
+sample_payloads.json
 *.log
 
 demo-data/

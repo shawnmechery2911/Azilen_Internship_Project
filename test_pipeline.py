@@ -19,6 +19,7 @@ from pipeline import (
     MappingStore,
     Pipeline,
     RuleBindingStore,
+    SamplePayloadStore,
     ValidationRule,
     ValidationRuleStore,
     parse_input,
@@ -113,6 +114,28 @@ class PipelineTests(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 store.approve("ats", "candidate", 2, "reviewer", payloads, rules)
+
+    def test_samples_are_kept_for_replay_and_deduplicated(self):
+        with TemporaryDirectory() as folder:
+            store = SamplePayloadStore(Path(folder) / "samples.json")
+            store.remember("acme", {"a": 1})
+            store.remember("acme", {"a": 1})          # same order twice
+            store.remember("acme", {"b": 2})
+            store.remember("other", {"c": 3})
+            self.assertEqual(store.for_ats("acme"), [{"a": 1}, {"b": 2}])
+            self.assertEqual(store.for_ats("other"), [{"c": 3}])
+            self.assertEqual(store.for_ats("nobody"), [])
+
+    def test_the_sample_corpus_is_capped(self):
+        """It guards approvals rather than archiving traffic, so it is read on
+        every approval and must not grow without bound."""
+        with TemporaryDirectory() as folder:
+            store = SamplePayloadStore(Path(folder) / "samples.json", limit=3)
+            for n in range(6):
+                store.remember("acme", {"n": n})
+            kept = store.for_ats("acme")
+            self.assertEqual(len(kept), 3)
+            self.assertEqual(kept, [{"n": 3}, {"n": 4}, {"n": 5}])
 
     def test_drift_requires_repeated_failures(self):
         with TemporaryDirectory() as folder:
@@ -352,6 +375,7 @@ class PipelineTests(unittest.TestCase):
                  patch.object(api, "ai_log", __import__("pipeline").AiUsageLog(Path(folder) / "ai_usage.json")), \
                  patch.object(api, "rules_store", ValidationRuleStore(Path(folder) / "rules.json")), \
                  patch.object(api, "queue", ExceptionQueue(Path(folder) / "exceptions.json")), \
+                 patch.object(api, "samples", SamplePayloadStore(Path(folder) / "samples.json")), \
                  patch("api.make_adapter", return_value=adapter):
                 client = TestClient(api.app)
                 response = client.post(

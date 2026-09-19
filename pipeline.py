@@ -443,6 +443,58 @@ class ValidationRuleStore(JsonBacked):
         self._stamp = file_stamp(self.path)
 
 
+class SamplePayloadStore(JsonBacked):
+    """Real payloads a partner has sent, kept so a mapping can be replayed.
+
+    Replay asks "does this new mapping still handle what this partner
+    actually sends?", which needs examples of what they actually send. The
+    first comes from the sample uploaded at onboarding; the rest are orders
+    that processed cleanly. Only clean ones: an order that already failed
+    proves nothing about a new mapping, and would block every future
+    approval.
+
+    Capped per partner, newest last, because this is a guardrail and not an
+    archive - the store is read on every approval.
+    """
+
+    LIMIT = 8
+
+    def __init__(self, path: str | Path = "sample_payloads.json", limit: int | None = None) -> None:
+        self.path = Path(path)
+        self.limit = limit or self.LIMIT
+        self._lock = threading.Lock()
+        self.samples: dict[str, list[dict[str, Any]]] = {}
+        self._stamp: tuple[int, int] | None = None
+        self._load()
+
+    def _load(self) -> None:
+        self._stamp = file_stamp(self.path)
+        if not self.path.exists() or not self.path.read_text(encoding="utf-8").strip():
+            self.samples = {}
+            return
+        self.samples = json.loads(self.path.read_text(encoding="utf-8"))
+
+    def for_ats(self, ats: str) -> list[dict[str, Any]]:
+        self._reload_if_changed()
+        return list(self.samples.get(ats, []))
+
+    def remember(self, ats: str, payload: dict[str, Any]) -> None:
+        """Keep this payload unless an identical one is already held."""
+        self._reload_if_changed()
+        held = self.samples.setdefault(ats, [])
+        if any(existing == payload for existing in held):
+            return
+        held.append(payload)
+        del held[: max(0, len(held) - self.limit)]
+        self._save()
+
+    def _save(self) -> None:
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(self.samples, indent=2), encoding="utf-8")
+        self._stamp = file_stamp(self.path)
+
+
 class RuleBindingStore(JsonBacked):
     """Which catalogue rules each partner is held to.
 

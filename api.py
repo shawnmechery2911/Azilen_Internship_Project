@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from bedrock_proposer import make_adapter
-from pipeline import AiUsageLog, DriftTracker, ExceptionQueue, MappingStore, Pipeline, RuleBindingStore, ValidationRuleStore, apply_mapping, parse_input
+from pipeline import AiUsageLog, DriftTracker, ExceptionQueue, MappingStore, Pipeline, RuleBindingStore, SamplePayloadStore, ValidationRuleStore, apply_mapping, parse_input
 
 ROOT = Path(__file__).resolve().parent
 app = FastAPI(title="Mapping Pipeline")
@@ -20,6 +20,7 @@ queue = ExceptionQueue(ROOT / "exceptions.json")
 tracker = DriftTracker(path=ROOT / "drift_counts.json")
 rules_store = ValidationRuleStore(ROOT / "validation_rules.json")
 bindings = RuleBindingStore(ROOT / "rule_bindings.json")
+samples = SamplePayloadStore(ROOT / "sample_payloads.json")
 
 
 def rules_for(ats: str):
@@ -62,12 +63,42 @@ def get_destination_fields():
     return json.loads((FIXTURES / "destination-fields.json").read_text(encoding="utf-8"))
 
 
+SEEDED_SAMPLES = {
+    "ideal-ats": ["ideallogic-order.json"],
+    "vsys": ["vsys-order.xml", "vsys-order-2addresses.xml"],
+}
+
+
 def replay_payloads_for(ats: str) -> list[dict]:
-    names = {
-        "ideal-ats": ["ideallogic-order.json"],
-        "vsys": ["vsys-order.xml", "vsys-order-2addresses.xml"],
-    }
-    return [parse_input((FIXTURES / name).read_text(encoding="utf-8")) for name in names.get(ats, [])]
+    """What this partner has actually sent.
+
+    This was a hardcoded dictionary of two seeded partner names, so any
+    partner onboarded through the UI replayed against nothing and every
+    approval sailed through unguarded. Real payloads come first; the seeded
+    files remain so the shipped demo partners still have a corpus before
+    they have processed anything.
+    """
+    stored = samples.for_ats(ats)
+    if stored:
+        return stored
+    return [
+        parse_input((FIXTURES / name).read_text(encoding="utf-8"))
+        for name in SEEDED_SAMPLES.get(ats, [])
+    ]
+
+
+def replay_label(ats: str, index: int) -> str:
+    """Name a replayed payload.
+
+    The seeded partners replay against files, so their names are the most
+    useful label. Anything a partner actually sent is just their nth stored
+    order - this used to index the seeded filename list for every partner,
+    which raised IndexError the moment a real partner was replayed.
+    """
+    names = SEEDED_SAMPLES.get(ats, [])
+    if not samples.for_ats(ats) and index < len(names):
+        return names[index]
+    return f"stored order {index + 1}"
 
 
 @app.get("/api/partners")
@@ -121,7 +152,7 @@ def replay_check(ats: str, payload_type: str, version: int):
     for index, payload in enumerate(replay_payloads_for(ats)):
         outcome = apply_mapping(mapping, payload, rules_for(ats))
         results.append({
-            "payload": {"ideal-ats": ["ideallogic-order.json"], "vsys": ["vsys-order.xml", "vsys-order-2addresses.xml"]}.get(ats, [])[index],
+            "payload": replay_label(ats, index),
             "status": outcome.status,
             "issues": [issue["field"] for issue in outcome.issues],
         })
@@ -131,7 +162,11 @@ def replay_check(ats: str, payload_type: str, version: int):
 @app.post("/api/mappings/{ats}/{payload_type}/draft")
 def draft_mapping(ats: str, payload_type: str, body: DraftRequest):
     adapter = make_adapter()
-    mappings = adapter.draft(parse_input(body.payload), body.destination_fields)
+    payload = parse_input(body.payload)
+    # the sample that produced this draft is the first thing we know this
+    # partner sends, so it becomes the seed of their replay corpus
+    samples.remember(ats, payload)
+    mappings = adapter.draft(payload, body.destination_fields)
     proposer = getattr(adapter, "proposer", None)
     ai_log.add(ats, payload_type, getattr(proposer, "model_id", "offline-matcher"), getattr(proposer, "last_usage", None))
     version = store.add_draft(
@@ -154,6 +189,11 @@ def process_payload(payload: dict):
     log.add(ats, payload_type, result)
     if result.status == "exception":
         queue.add(ats, payload_type, data, result)
+    else:
+        # an order that mapped cleanly is exactly what a future mapping has to
+        # keep handling, so it joins the replay corpus; a failed one proves
+        # nothing and would block every later approval
+        samples.remember(ats, parse_input(data))
     return result
 
 
