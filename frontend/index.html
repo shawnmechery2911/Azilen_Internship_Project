@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pipeline Control</title>
+    <script>
+      // Apply the saved theme before first paint, so a dark-theme user never
+      // sees a flash of the light default.
+      try {
+        if (localStorage.getItem("pipeline-theme") === "dark") {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
