@@ -14,6 +14,7 @@ function App() {
   const [screen, setScreen] = useState("Overview");
   const [apiUp, setApiUp] = useState(true);
   const [queueAts, setQueueAts] = useState<string | null>(null);
+  const [openCount, setOpenCount] = useState(0);
   const [review, setReview] = useState<{
     ats: string;
     payloadType: string;
@@ -26,7 +27,10 @@ function App() {
   useEffect(() => {
     const refresh = () => {
       void getExceptions()
-        .then(() => setApiUp(true))
+        .then((records) => {
+          setApiUp(true);
+          setOpenCount(records.filter((item) => item.status === "open").length);
+        })
         .catch(() => setApiUp(false));
     };
     refresh();
@@ -59,6 +63,7 @@ function App() {
       activeNav={screen === "Review" ? "Overview" : screen}
       onNavigate={navigate}
       apiUp={apiUp}
+      openExceptions={openCount}
     >
       {content}
     </Shell>

@@ -32,11 +32,13 @@ export function Shell({
   onNavigate,
   children,
   apiUp = true,
+  openExceptions = 0,
 }: {
   activeNav: string;
   onNavigate: (screen: string) => void;
   children: ReactNode;
   apiUp?: boolean;
+  openExceptions?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(storedTheme);
@@ -72,6 +74,9 @@ export function Shell({
             >
               <Icon size={17} />
               <span>{label}</span>
+              {label === "Exceptions" && openExceptions > 0 && (
+                <em className="nav-count">{openExceptions}</em>
+              )}
             </button>
           ))}
           <button
