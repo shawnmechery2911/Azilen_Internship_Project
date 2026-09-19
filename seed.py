@@ -71,7 +71,10 @@ def seed() -> None:
 
     store = MappingStore(store_path)
     ideal_rows = [
-        FieldMapping(**{**row, "required": False})
+        # the fixture carries the approver's required flags; they were being
+        # overwritten to False, which only worked while every absent field was
+        # reported regardless
+        FieldMapping(**row)
         for row in json.loads((FIXTURES / "ideallogic-mapping.json").read_text(encoding="utf-8"))
         if row["source"].startswith("Static:") or row["source"] in {
             "Username", "AccountNumber", "Package", "FCRAPurpose", "Person.ApplicantID",

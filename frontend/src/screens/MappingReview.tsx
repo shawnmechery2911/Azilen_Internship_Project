@@ -39,11 +39,13 @@ export function MappingReviewScreen({
   payloadType,
   version,
   onDone,
+  onApproved,
 }: {
   ats: string;
   payloadType: string;
   version: number;
   onDone: () => void;
+  onApproved?: (ats: string) => void;
 }) {
   const [mapping, setMapping] = useState<MappingVersion | null>(null);
   const [replay, setReplay] = useState<ReplayResult | null>(null);
@@ -116,7 +118,8 @@ export function MappingReviewScreen({
     setError("");
     try {
       await approveMapping(ats, payloadType, version, reviewer);
-      onDone();
+      if (onApproved) onApproved(ats);
+      else onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Approval failed");
     } finally {

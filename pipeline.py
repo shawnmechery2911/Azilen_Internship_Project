@@ -166,6 +166,10 @@ class ValidationRule:
     allowed_values: tuple[str, ...] = ()
     check: str | None = None
     enabled: bool = True
+    # True only when a partner was explicitly bound to this rule. It is a
+    # property of the pairing, not of the rule, so it is never stored in the
+    # catalogue - rules_for sets it.
+    bound: bool = False
 
 
 def check_min_age_18(value: str) -> str | None:
@@ -480,13 +484,14 @@ class RuleBindingStore(JsonBacked):
         for rule in catalogue:
             binding = chosen.get(rule.id)
             if binding is None:
-                applied.append(replace_fields(rule, required=False))
+                applied.append(replace_fields(rule, required=False, bound=False))
             else:
                 applied.append(
                     replace_fields(
                         rule,
                         enabled=binding.get("enabled", rule.enabled),
                         required=binding.get("required", False),
+                        bound=True,
                     )
                 )
         return applied
@@ -752,19 +757,23 @@ def _issue(rule: ValidationRule, message: str) -> dict[str, str]:
 
 
 def presence_rules(rules: Iterable[ValidationRule]) -> dict[str, bool]:
-    """Which destinations have a rule speaking for presence, and its answer.
+    """Destinations a human has explicitly decided the presence of.
 
-    Only Completeness rules say whether a field has to be there. A Format or
-    Business rule constrains the value when one is present and says nothing
-    about whether it must be - reading those as "optional" would quietly stop
-    required fields being reported.
+    Only Completeness rules speak to presence: a Format or Business rule
+    constrains a value when one is there and says nothing about whether it
+    must be.
 
-    A destination with several Completeness rules is required if any enabled
-    one says so.
+    Only *bound* rules count. An unbound rule is a default, not a decision,
+    and letting defaults answer here would silently overrule the required
+    flags the approver set on the mapping - which is where presence is first
+    decided, with the partner's real payload in front of them.
+
+    A destination with several bound Completeness rules is required if any
+    enabled one says so.
     """
     presence: dict[str, bool] = {}
     for rule in rules:
-        if rule.enabled and rule.group == "Completeness":
+        if rule.enabled and rule.bound and rule.group == "Completeness":
             presence[rule.field] = presence.get(rule.field, False) or rule.required
     return presence
 
@@ -772,15 +781,18 @@ def presence_rules(rules: Iterable[ValidationRule]) -> dict[str, bool]:
 def is_presence_required(item: FieldMapping, presence: dict[str, bool]) -> bool:
     """Whether a missing source value is worth reporting.
 
-    A validation rule covering the destination is the authority, so the
-    "must be present" toggle on the Validation screen genuinely governs
-    presence. Without that, a field marked required on the mapping would
-    fail whatever the toggle said, and the toggle would look broken.
-    Destinations no rule covers keep the mapping's own required flag.
+    A rule this partner was explicitly bound to is the authority, so the
+    "must be present" toggle genuinely governs presence. Everything else
+    falls back to the required flag the approver set on the mapping: they
+    chose it looking at the partner's actual payload, which makes it the
+    better default than demanding nothing at all.
     """
     if item.destination in presence:
         return presence[item.destination]
-    return item.required or not item.source_is_list
+    # `or not item.source_is_list` used to sit here, which reported every
+    # single-value field when it was absent and made required=False on a
+    # mapping mean nothing - an optional middle name raised an exception.
+    return item.required
 
 
 def static_value(source: str) -> str:

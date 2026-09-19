@@ -14,6 +14,7 @@ function App() {
   const [screen, setScreen] = useState("Overview");
   const [apiUp, setApiUp] = useState(true);
   const [queueAts, setQueueAts] = useState<string | null>(null);
+  const [ruleScope, setRuleScope] = useState<string | null>(null);
   const [openCount, setOpenCount] = useState(0);
   const [review, setReview] = useState<{
     ats: string;
@@ -39,7 +40,14 @@ function App() {
   }, []);
   const navigate = (next: string, ats?: string) => {
     setQueueAts(ats ?? null);
+    if (next !== "Validation") setRuleScope(null);
     setScreen(next);
+  };
+  /** Approving is the moment the destination fields are known, so that is
+   *  where choosing what the partner must send belongs. */
+  const afterApproval = (ats: string) => {
+    setRuleScope(ats);
+    setScreen("Validation");
   };
   const content =
     screen === "Exceptions" ? (
@@ -47,9 +55,13 @@ function App() {
     ) : screen === "Onboard" ? (
       <OnboardingScreen onReview={openReview} />
     ) : screen === "Validation" ? (
-      <RulesScreen />
+      <RulesScreen scope={ruleScope} />
     ) : screen === "Review" && review ? (
-      <MappingReviewScreen {...review} onDone={() => setScreen("Overview")} />
+      <MappingReviewScreen
+        {...review}
+        onDone={() => setScreen("Overview")}
+        onApproved={afterApproval}
+      />
     ) : (
       <>
         <OverviewScreen onNavigate={navigate} onReview={openReview} />

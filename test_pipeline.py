@@ -217,7 +217,9 @@ class PipelineTests(unittest.TestCase):
             store.add_draft("ats", "candidate", [FieldMapping("Person.SSN", "Applicant.SSN", True)], proposed_by="author")
             store.approve("ats", "candidate", 1, "reviewer")
             pipeline = Pipeline(store)
-            rule = ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "an SSN", required=True)
+            # bound=True is what rules_for sets when a partner has actually
+            # been bound to a rule; an unbound rule is only a default.
+            rule = ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "an SSN", required=True, bound=True)
 
             demanded = pipeline.process("ats", "candidate", {"Person": {}}, [rule])
             self.assertEqual(demanded.status, "exception")
@@ -226,6 +228,19 @@ class PipelineTests(unittest.TestCase):
             relaxed = pipeline.process("ats", "candidate", {"Person": {}}, [replace(rule, required=False)])
             self.assertEqual(relaxed.status, "processed")
             self.assertEqual(relaxed.issues, [])
+
+    def test_an_unbound_rule_does_not_overrule_the_approver(self):
+        """The approver marked this field required while looking at the
+        partner's payload. A catalogue rule nobody bound this partner to is a
+        default, not a decision, and must not quietly relax it."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.Email", "Applicant.Email", True)], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            unbound = ValidationRule("email_present", "Applicant.Email", "Completeness", "an email", required=False)
+            result = Pipeline(store).process("ats", "candidate", {"Person": {}}, [unbound])
+            self.assertEqual(result.status, "exception")
+            self.assertEqual([i["field"] for i in result.issues], ["Applicant.Email"])
 
     def test_a_field_no_rule_covers_keeps_the_mapping_flag(self):
         """Turning presence over to the rules must not make uncovered fields
@@ -312,7 +327,12 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result.status, "exception")
         self.assertEqual(result.mapped_payload["Applicant"]["Names"][0]["GivenName"], "StefTest")
         self.assertEqual(result.mapped_payload["Version"], "1.0")
-        self.assertTrue(any("TransactInfo.TransactId" in issue["field"] for issue in result.issues))
+        # SSN is marked required in the fixture and this order does not carry
+        # one. TransactInfo.TransactId is marked optional and is absent too,
+        # and used to be reported anyway - it must not be now.
+        reported = [issue["field"] for issue in result.issues]
+        self.assertIn("Applicant.SSN", reported)
+        self.assertNotIn("TransactInfo.TransactId", reported)
 
     def test_draft_endpoint_returns_abstentions(self):
         import api

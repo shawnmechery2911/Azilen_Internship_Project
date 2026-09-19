@@ -11,14 +11,15 @@ import { EmptyState, ErrorPanel, Loading } from "../components/ScreenState";
 
 const GROUPS = ["Completeness", "Format", "Business"] as const;
 
-export function RulesScreen() {
+export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) {
   const [rules, setRules] = useState<ValidationRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [partners, setPartners] = useState<Partner[]>([]);
   // "" means the catalogue itself - the default every partner starts from
-  const [scope, setScope] = useState<string>("");
+  const [scope, setScope] = useState<string>(initial ?? "");
+  const justApproved = Boolean(initial) && scope === initial;
   const [savedRule, setSavedRule] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,6 +97,14 @@ export function RulesScreen() {
           </p>
         </div>
       </section>
+      {justApproved && (
+        <div className="filter-note">
+          <span>
+            <strong>{initial}</strong> is approved. Choose what it must send -
+            shape checks already apply.
+          </span>
+        </div>
+      )}
       {error && <div className="toast">{error}</div>}
       <div className="filter-group" style={{ marginBottom: 16 }}>
         <button
