@@ -556,3 +556,6 @@ button.mapping-list-row:hover {
   font-size: var(--fs-label);
   font-weight: 600;
 }
+.page-wrap-tight {
+  padding-top: 0;
+}

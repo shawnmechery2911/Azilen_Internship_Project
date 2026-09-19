@@ -5,7 +5,6 @@ import { getExceptions } from "./api";
 import { Shell } from "./components/Shell";
 import { ExceptionsScreen } from "./screens/Exceptions";
 import { MappingReviewScreen } from "./screens/MappingReview";
-import { MappingsScreen } from "./screens/Mappings";
 import { OnboardingScreen } from "./screens/Onboarding";
 import { OverviewScreen } from "./screens/Overview";
 import { ProcessPanel } from "./components/ProcessPanel";
@@ -36,23 +35,23 @@ function App() {
   const content =
     screen === "Exceptions" ? (
       <ExceptionsScreen />
-    ) : screen === "Mappings" ? (
-      <MappingsScreen onReview={openReview} />
     ) : screen === "Onboard" ? (
       <OnboardingScreen onReview={openReview} />
     ) : screen === "Validation" ? (
       <RulesScreen />
     ) : screen === "Review" && review ? (
-      <MappingReviewScreen {...review} onDone={() => setScreen("Mappings")} />
+      <MappingReviewScreen {...review} onDone={() => setScreen("Overview")} />
     ) : (
       <>
-        <ProcessPanel onReview={openReview} />
         <OverviewScreen onNavigate={setScreen} onReview={openReview} />
+        <div className="page-wrap page-wrap-tight">
+          <ProcessPanel onReview={openReview} />
+        </div>
       </>
     );
   return (
     <Shell
-      activeNav={screen === "Review" ? "Mappings" : screen}
+      activeNav={screen === "Review" ? "Overview" : screen}
       onNavigate={setScreen}
       apiUp={apiUp}
     >

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Code2,
-  GitBranch,
   Inbox,
   Layers3,
   Menu,
@@ -13,7 +12,6 @@ import {
 
 const navItems = [
   ["Overview", Layers3],
-  ["Mappings", GitBranch],
   ["Exceptions", Inbox],
   ["Onboard", Code2],
 ] as const;

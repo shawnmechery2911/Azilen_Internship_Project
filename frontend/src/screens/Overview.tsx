@@ -4,12 +4,22 @@ import {
   getAiUsage,
   getExceptions,
   getPartners,
+  getVersions,
   type AiUsage,
   type ActivityRecord,
   type ExceptionRecord,
+  type MappingVersion,
   type Partner,
 } from "../api";
 import { ErrorPanel, Loading, EmptyState } from "../components/ScreenState";
+
+type Attention = {
+  key: string;
+  ats: string;
+  what: string;
+  action: string;
+  run: () => void;
+};
 
 export function OverviewScreen({
   onNavigate,
@@ -18,14 +28,16 @@ export function OverviewScreen({
   onNavigate: (screen: string) => void;
   onReview: (ats: string, payloadType: string, version: number) => void;
 }) {
-  void onReview;
   const [activity, setActivity] = useState<ActivityRecord[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionRecord[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [usage, setUsage] = useState<AiUsage | null>(null);
+  const [versions, setVersions] = useState<MappingVersion[]>([]);
+  const [selected, setSelected] = useState<Partner | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+
   async function load() {
     setLoading(true);
     setError("");
@@ -50,6 +62,16 @@ export function OverviewScreen({
   useEffect(() => {
     void load();
   }, []);
+
+  async function openPartner(partner: Partner) {
+    setSelected(partner);
+    try {
+      setVersions(await getVersions(partner.ats, partner.payload_type));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
+    }
+  }
+
   const filtered = useMemo(
     () =>
       filter === "all"
@@ -57,18 +79,43 @@ export function OverviewScreen({
         : activity.filter((item) => item.status === filter),
     [activity, filter],
   );
-  const processed = activity.filter(
-    (item) => item.status === "processed" && item.processed_at.startsWith(new Date().toISOString().slice(0, 10)),
-  ).length;
-  const openExceptions = exceptions.filter(
-    (item) => item.status === "open",
-  ).length;
-  const activeMappings = partners.filter(
-    (item) => item.version !== null,
-  ).length;
-  const success = activity.length
-    ? Math.round((processed / activity.length) * 100)
-    : 0;
+
+  /** Only things somebody has to act on, each carrying the action itself. */
+  const attention = useMemo<Attention[]>(() => {
+    const items: Attention[] = [];
+    for (const partner of partners) {
+      if (partner.pending_drafts > 0) {
+        items.push({
+          key: `draft-${partner.ats}`,
+          ats: partner.ats,
+          what: `${partner.pending_drafts} mapping draft${partner.pending_drafts === 1 ? "" : "s"} awaiting approval`,
+          action: "Review",
+          run: () => void openPartner(partner),
+        });
+      } else if (partner.version === null) {
+        items.push({
+          key: `unmapped-${partner.ats}`,
+          ats: partner.ats,
+          what: "No approved mapping yet",
+          action: "Onboard",
+          run: () => onNavigate("Onboard"),
+        });
+      }
+    }
+    const open = exceptions.filter((item) => item.status === "open");
+    for (const ats of new Set(open.map((item) => item.ats))) {
+      const count = open.filter((item) => item.ats === ats).length;
+      items.push({
+        key: `exc-${ats}`,
+        ats,
+        what: `${count} open exception${count === 1 ? "" : "s"}`,
+        action: "Open queue",
+        run: () => onNavigate("Exceptions"),
+      });
+    }
+    return items;
+  }, [partners, exceptions, onNavigate]);
+
   if (loading)
     return (
       <div className="page-wrap">
@@ -81,6 +128,7 @@ export function OverviewScreen({
         <ErrorPanel message={error} retry={() => void load()} />
       </div>
     );
+
   return (
     <div className="page-wrap">
       <section className="page-heading">
@@ -95,49 +143,74 @@ export function OverviewScreen({
           Onboard partner
         </button>
       </section>
-      <section className="metric-grid">
-        <Metric label="Processed" value={String(processed)} />
-        <Metric label="Success rate" value={`${success}%`} />
-        <Metric label="Open exceptions" value={String(openExceptions)} />
-        <Metric label="Active mappings" value={String(activeMappings)} />
-      </section>
-      {usage && <CostPanel usage={usage} />}
-      <section className="content-grid">
-        <article className="panel">
-          <h2>Mapping approvals</h2>
-          {partners
-            .filter((item) => item.pending_drafts > 0)
-            .map((item) => (
-              <button
-                className="mapping-list-row"
-                key={item.ats}
-                onClick={() => onNavigate("Mappings")}
-              >
-                <strong>{item.ats}</strong>
-                <span>{item.pending_drafts} pending draft(s)</span>
-                <em>Review</em>
-              </button>
-            ))}
-          {!partners.some((item) => item.pending_drafts > 0) && (
-            <EmptyState label="No mappings are awaiting approval." />
-          )}
-        </article>
-        <article className="panel">
-          <h2>Connection status</h2>
-          {partners.map((item) => (
-            <div
+
+      <section className="panel">
+        <h2>Needs attention</h2>
+        {attention.length ? (
+          attention.map((item) => (
+            <button
               className="mapping-list-row"
-              key={`${item.ats}-${item.payload_type}`}
+              key={item.key}
+              onClick={item.run}
             >
               <strong>{item.ats}</strong>
-              <span>
-                {item.payload_type} · {item.status}
-              </span>
-              <em>v{item.version ?? "-"}</em>
-            </div>
-          ))}
-        </article>
+              <span>{item.what}</span>
+              <em>{item.action}</em>
+            </button>
+          ))
+        ) : (
+          <EmptyState label="Nothing needs attention. Every partner is mapped and processing." />
+        )}
       </section>
+
+      <div className="content-grid">
+        <div className="panel">
+          <h2>Partners</h2>
+          {partners.map((partner) => (
+            <button
+              className="mapping-list-row"
+              key={`${partner.ats}-${partner.payload_type}`}
+              onClick={() => void openPartner(partner)}
+            >
+              <strong>{partner.ats}</strong>
+              <span>
+                {partner.payload_type} ·{" "}
+                {partner.version === null
+                  ? "needs mapping"
+                  : `v${partner.version} ${partner.status}`}
+              </span>
+              <em>
+                {partner.pending_drafts > 0
+                  ? `${partner.pending_drafts} draft(s)`
+                  : "History"}
+              </em>
+            </button>
+          ))}
+        </div>
+        <div className="panel">
+          <h2>{selected ? `${selected.ats} versions` : "Select a partner"}</h2>
+          {selected ? (
+            versions.map((version) => (
+              <button
+                className="mapping-list-row"
+                key={version.version}
+                onClick={() =>
+                  onReview(version.ats, version.payload_type, version.version)
+                }
+              >
+                <strong>Version {version.version}</strong>
+                <span>
+                  {version.status} · proposed by {version.proposed_by}
+                </span>
+                <em>Open review</em>
+              </button>
+            ))
+          ) : (
+            <EmptyState label="Pick a partner to see its mapping versions." />
+          )}
+        </div>
+      </div>
+
       <section className="panel activity-section">
         <div className="panel-heading">
           <div>
@@ -151,7 +224,7 @@ export function OverviewScreen({
                 className={filter === item ? "filter-active" : ""}
                 onClick={() => setFilter(item)}
               >
-                {item}
+                {item.replace("_", " ")}
               </button>
             ))}
           </div>
@@ -172,20 +245,9 @@ export function OverviewScreen({
           <EmptyState label="No activity matches this filter." />
         )}
       </section>
+
+      {usage && <CostPanel usage={usage} />}
     </div>
-  );
-}
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="metric-card">
-      <div className="metric-top">
-        <span>{label}</span>
-      </div>
-      <strong>{value}</strong>
-      <div className="metric-foot">
-        <span>{label === "Processed" ? "All time" : "Current"}</span>
-      </div>
-    </article>
   );
 }
 

@@ -87,7 +87,7 @@ export function ProcessPanel({
       <div className="panel-heading">
         <div>
           <span className="section-kicker">Deterministic runtime</span>
-          <h2>Run an order</h2>
+          <h2>Send a test order</h2>
         </div>
         <span className="status-pill">No model call</span>
       </div>
