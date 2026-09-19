@@ -63,7 +63,9 @@ export function RulesScreen() {
   if (!rules.length)
     return (
       <div className="page-wrap">
-        <EmptyState label="No validation rules configured." />
+        <div className="panel">
+          <EmptyState label="No validation rules configured." />
+        </div>
       </div>
     );
   const filteredRules =

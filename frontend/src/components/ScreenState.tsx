@@ -1,8 +1,10 @@
 export function Loading({ label = "Loading..." }: { label?: string }) {
   return <div className="panel screen-state">{label}</div>;
 }
+/** Plain text, because this nearly always sits inside a panel already - giving
+ *  it its own card produced a box drawn inside a box. */
 export function EmptyState({ label }: { label: string }) {
-  return <div className="panel screen-state">{label}</div>;
+  return <p className="empty-note">{label}</p>;
 }
 export function ErrorPanel({
   message,

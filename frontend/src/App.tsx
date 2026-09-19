@@ -13,6 +13,7 @@ import { RulesScreen } from "./screens/Rules";
 function App() {
   const [screen, setScreen] = useState("Overview");
   const [apiUp, setApiUp] = useState(true);
+  const [queueAts, setQueueAts] = useState<string | null>(null);
   const [review, setReview] = useState<{
     ats: string;
     payloadType: string;
@@ -32,9 +33,13 @@ function App() {
     const timer = window.setInterval(refresh, 5000);
     return () => window.clearInterval(timer);
   }, []);
+  const navigate = (next: string, ats?: string) => {
+    setQueueAts(ats ?? null);
+    setScreen(next);
+  };
   const content =
     screen === "Exceptions" ? (
-      <ExceptionsScreen />
+      <ExceptionsScreen ats={queueAts} />
     ) : screen === "Onboard" ? (
       <OnboardingScreen onReview={openReview} />
     ) : screen === "Validation" ? (
@@ -43,7 +48,7 @@ function App() {
       <MappingReviewScreen {...review} onDone={() => setScreen("Overview")} />
     ) : (
       <>
-        <OverviewScreen onNavigate={setScreen} onReview={openReview} />
+        <OverviewScreen onNavigate={navigate} onReview={openReview} />
         <div className="page-wrap page-wrap-tight">
           <ProcessPanel onReview={openReview} />
         </div>
@@ -52,7 +57,7 @@ function App() {
   return (
     <Shell
       activeNav={screen === "Review" ? "Overview" : screen}
-      onNavigate={setScreen}
+      onNavigate={navigate}
       apiUp={apiUp}
     >
       {content}

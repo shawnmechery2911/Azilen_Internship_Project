@@ -13,6 +13,22 @@ import {
 } from "../api";
 import { ErrorPanel, Loading, EmptyState } from "../components/ScreenState";
 
+function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/** A feed without times is just a list, so every row gets one. */
+function since(iso: string): string {
+  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (!Number.isFinite(seconds)) return "";
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
 type Attention = {
   key: string;
   ats: string;
@@ -25,15 +41,15 @@ export function OverviewScreen({
   onNavigate,
   onReview,
 }: {
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, ats?: string) => void;
   onReview: (ats: string, payloadType: string, version: number) => void;
 }) {
   const [activity, setActivity] = useState<ActivityRecord[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionRecord[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [usage, setUsage] = useState<AiUsage | null>(null);
-  const [versions, setVersions] = useState<MappingVersion[]>([]);
-  const [selected, setSelected] = useState<Partner | null>(null);
+  const [versions, setVersions] = useState<Record<string, MappingVersion[]>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
@@ -63,12 +79,21 @@ export function OverviewScreen({
     void load();
   }, []);
 
-  async function openPartner(partner: Partner) {
-    setSelected(partner);
-    try {
-      setVersions(await getVersions(partner.ats, partner.payload_type));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+  /** Versions open under the partner row itself, so nothing sits empty. */
+  async function togglePartner(partner: Partner) {
+    const key = `${partner.ats}-${partner.payload_type}`;
+    if (expanded === key) {
+      setExpanded(null);
+      return;
+    }
+    setExpanded(key);
+    if (!versions[key]) {
+      try {
+        const found = await getVersions(partner.ats, partner.payload_type);
+        setVersions((current) => ({ ...current, [key]: found }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Request failed");
+      }
     }
   }
 
@@ -80,7 +105,6 @@ export function OverviewScreen({
     [activity, filter],
   );
 
-  /** Only things somebody has to act on, each carrying the action itself. */
   const attention = useMemo<Attention[]>(() => {
     const items: Attention[] = [];
     for (const partner of partners) {
@@ -88,9 +112,9 @@ export function OverviewScreen({
         items.push({
           key: `draft-${partner.ats}`,
           ats: partner.ats,
-          what: `${partner.pending_drafts} mapping draft${partner.pending_drafts === 1 ? "" : "s"} awaiting approval`,
+          what: `${plural(partner.pending_drafts, "mapping draft")} awaiting approval`,
           action: "Review",
-          run: () => void openPartner(partner),
+          run: () => void togglePartner(partner),
         });
       } else if (partner.version === null) {
         items.push({
@@ -108,12 +132,13 @@ export function OverviewScreen({
       items.push({
         key: `exc-${ats}`,
         ats,
-        what: `${count} open exception${count === 1 ? "" : "s"}`,
+        what: plural(count, "open exception"),
         action: "Open queue",
-        run: () => onNavigate("Exceptions"),
+        run: () => onNavigate("Exceptions", ats),
       });
     }
     return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partners, exceptions, onNavigate]);
 
   if (loading)
@@ -133,13 +158,9 @@ export function OverviewScreen({
     <div className="page-wrap">
       <section className="page-heading">
         <div>
-          <div className="eyebrow">{new Date().toLocaleDateString()}</div>
           <h1>Pipeline overview</h1>
         </div>
-        <button
-          className="primary-button"
-          onClick={() => onNavigate("Onboard")}
-        >
+        <button className="primary-button" onClick={() => onNavigate("Onboard")}>
           Onboard partner
         </button>
       </section>
@@ -148,14 +169,13 @@ export function OverviewScreen({
         <h2>Needs attention</h2>
         {attention.length ? (
           attention.map((item) => (
-            <button
-              className="mapping-list-row"
-              key={item.key}
-              onClick={item.run}
-            >
+            <button className="row-link" key={item.key} onClick={item.run}>
               <strong>{item.ats}</strong>
               <span>{item.what}</span>
-              <em>{item.action}</em>
+              <em className="row-action">
+                {item.action}
+                <span aria-hidden="true">›</span>
+              </em>
             </button>
           ))
         ) : (
@@ -163,82 +183,92 @@ export function OverviewScreen({
         )}
       </section>
 
-      <div className="content-grid">
-        <div className="panel">
-          <h2>Partners</h2>
-          {partners.map((partner) => (
+      <section className="panel">
+        <h2>Partners</h2>
+        {partners.map((partner) => {
+          const key = `${partner.ats}-${partner.payload_type}`;
+          const isOpen = expanded === key;
+          const rows = versions[key];
+          return (
+            <div key={key}>
+              <button className="row-link" onClick={() => void togglePartner(partner)}>
+                <strong>{partner.ats}</strong>
+                <span>
+                  {partner.payload_type} ·{" "}
+                  {partner.version === null
+                    ? "needs mapping"
+                    : `v${partner.version} ${partner.status}`}
+                </span>
+                {partner.pending_drafts > 0 && (
+                  <span className="row-badge">
+                    {plural(partner.pending_drafts, "draft")}
+                  </span>
+                )}
+                <em className="row-action">
+                  {isOpen ? "Hide" : "Versions"}
+                  <span aria-hidden="true">{isOpen ? "⌃" : "⌄"}</span>
+                </em>
+              </button>
+              {isOpen && (
+                <div className="row-expand">
+                  {rows ? (
+                    rows.map((version) => (
+                      <button
+                        className="row-link row-nested"
+                        key={version.version}
+                        onClick={() =>
+                          onReview(
+                            version.ats,
+                            version.payload_type,
+                            version.version,
+                          )
+                        }
+                      >
+                        <strong>Version {version.version}</strong>
+                        <span>
+                          {version.status} · proposed by {version.proposed_by}
+                        </span>
+                        <em className="row-action">
+                          Open review
+                          <span aria-hidden="true">›</span>
+                        </em>
+                      </button>
+                    ))
+                  ) : (
+                    <EmptyState label="Loading versions..." />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="panel">
+        <h2>Recent activity</h2>
+        <div className="filter-group filter-row">
+          {["all", "processed", "exception", "needs_mapping"].map((item) => (
             <button
-              className="mapping-list-row"
-              key={`${partner.ats}-${partner.payload_type}`}
-              onClick={() => void openPartner(partner)}
+              key={item}
+              className={filter === item ? "filter-active" : ""}
+              onClick={() => setFilter(item)}
             >
-              <strong>{partner.ats}</strong>
-              <span>
-                {partner.payload_type} ·{" "}
-                {partner.version === null
-                  ? "needs mapping"
-                  : `v${partner.version} ${partner.status}`}
-              </span>
-              <em>
-                {partner.pending_drafts > 0
-                  ? `${partner.pending_drafts} draft(s)`
-                  : "History"}
-              </em>
+              {item.replace("_", " ")}
             </button>
           ))}
         </div>
-        <div className="panel">
-          <h2>{selected ? `${selected.ats} versions` : "Select a partner"}</h2>
-          {selected ? (
-            versions.map((version) => (
-              <button
-                className="mapping-list-row"
-                key={version.version}
-                onClick={() =>
-                  onReview(version.ats, version.payload_type, version.version)
-                }
-              >
-                <strong>Version {version.version}</strong>
-                <span>
-                  {version.status} · proposed by {version.proposed_by}
-                </span>
-                <em>Open review</em>
-              </button>
-            ))
-          ) : (
-            <EmptyState label="Pick a partner to see its mapping versions." />
-          )}
-        </div>
-      </div>
-
-      <section className="panel activity-section">
-        <div className="panel-heading">
-          <div>
-            <span className="section-kicker">Live feed</span>
-            <h2>Recent activity</h2>
-          </div>
-          <div className="filter-group">
-            {["all", "processed", "exception", "needs_mapping"].map((item) => (
-              <button
-                key={item}
-                className={filter === item ? "filter-active" : ""}
-                onClick={() => setFilter(item)}
-              >
-                {item.replace("_", " ")}
-              </button>
-            ))}
-          </div>
-        </div>
         {filtered.length ? (
           filtered.map((item) => (
-            <div className="mapping-list-row" key={item.id}>
+            <div className="row-link row-static" key={item.id}>
               <strong>{item.ats}</strong>
               <span>
                 {item.payload_type} · {item.status}
               </span>
-              <em>
-                v{item.mapping_version ?? "-"} · {item.issue_count} issue(s)
-              </em>
+              <code className="row-meta">
+                v{item.mapping_version ?? "-"} ·{" "}
+                {plural(item.issue_count, "issue")}
+              </code>
+              <span className="row-time">{since(item.processed_at)}</span>
             </div>
           ))
         ) : (

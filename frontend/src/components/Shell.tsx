@@ -60,15 +60,7 @@ export function Shell({
             <span>mapping control</span>
           </div>
         </div>
-        <div className="workspace-switcher">
-          <div className="workspace-dot">P</div>
-          <div>
-            <span>Workspace</span>
-            <strong>{window.location.host}</strong>
-          </div>
-        </div>
         <nav className="main-nav" aria-label="Primary navigation">
-          <span className="nav-label">Monitor</span>
           {navItems.map(([label, Icon]) => (
             <button
               key={label}
@@ -82,7 +74,6 @@ export function Shell({
               <span>{label}</span>
             </button>
           ))}
-          <span className="nav-label nav-label-spaced">Configure</span>
           <button
             className={`nav-item ${activeNav === "Validation" ? "nav-active" : ""}`}
             onClick={() => onNavigate("Validation")}

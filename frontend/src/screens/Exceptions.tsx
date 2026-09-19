@@ -8,12 +8,13 @@ import {
 import { ErrorPanel, Loading, EmptyState } from "../components/ScreenState";
 import { IssueList } from "../components/IssueList";
 
-export function ExceptionsScreen() {
+export function ExceptionsScreen({ ats }: { ats?: string | null }) {
   const [records, setRecords] = useState<ExceptionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [owners, setOwners] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState("");
+  const [showAll, setShowAll] = useState(false);
   async function load() {
     setLoading(true);
     setError("");
@@ -55,9 +56,13 @@ export function ExceptionsScreen() {
   if (!records.length)
     return (
       <div className="page-wrap">
-        <EmptyState label="No exceptions available." />
+        <div className="panel">
+          <EmptyState label="No exceptions available." />
+        </div>
       </div>
     );
+  const visible =
+    ats && !showAll ? records.filter((item) => item.ats === ats) : records;
   return (
     <div className="page-wrap">
       <section className="page-heading">
@@ -66,9 +71,19 @@ export function ExceptionsScreen() {
           <h1>Exception queue</h1>
         </div>
       </section>
+      {ats && (
+        <div className="filter-note">
+          <span>
+            Showing <strong>{ats}</strong> only
+          </span>
+          <a href="#all" onClick={() => setShowAll(true)}>
+            Show every partner
+          </a>
+        </div>
+      )}
       {error && <div className="toast">{error}</div>}
       <section className="panel exception-list">
-        {records.map((record) => (
+        {visible.map((record) => (
           <article className="mapping-rule" key={record.id}>
             <strong>
               {record.ats} / {record.payload_type} · {record.status}
