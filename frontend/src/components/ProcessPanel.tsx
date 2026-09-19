@@ -89,9 +89,7 @@ export function ProcessPanel({
           <span className="section-kicker">Deterministic runtime</span>
           <h2>Run an order</h2>
         </div>
-        <span className="status-pill">
-          {result ? (result.status === "processed" ? "Processed" : "Exception") : "No model call"}
-        </span>
+        <span className="status-pill">No model call</span>
       </div>
       <div className="process-controls">
         <select

@@ -186,7 +186,7 @@ function Metric({ label, value }: { label: string; value: string }) {
       </div>
       <strong>{value}</strong>
       <div className="metric-foot">
-        <span>{label === "Processed" ? "Today" : "Current"}</span>
+        <span>{label === "Processed" ? "All time" : "Current"}</span>
       </div>
     </article>
   );

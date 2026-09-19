@@ -67,7 +67,9 @@ export function RulesScreen() {
       </div>
     );
   const filteredRules =
-    filter === "All" ? rules : rules.filter((rule) => (rule.ats ?? "all") === filter);
+    filter === "All"
+      ? rules
+      : rules.filter((rule) => rule.ats === null || rule.ats === filter);
   return (
     <div className="page-wrap">
       <section className="page-heading">
