@@ -306,7 +306,7 @@ def close_exception(record_id: str):
 
 @app.get("/api/ai-usage")
 def get_ai_usage():
-    calls = ai_log.records
+    calls = ai_log.all()
     return {
         "calls": len(calls),
         "input_tokens": sum(item.input_tokens for item in calls),

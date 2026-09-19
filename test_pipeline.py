@@ -18,6 +18,7 @@ from pipeline import (
     MappingDraft,
     MappingStore,
     Pipeline,
+    AiUsageLog,
     RuleBindingStore,
     SamplePayloadStore,
     ValidationRule,
@@ -181,6 +182,18 @@ class PipelineTests(unittest.TestCase):
             store.approve("ats", "candidate", 1, "reviewer")
             with self.assertRaises(ValueError):
                 store.edit_draft("ats", "candidate", 1, "A", source="b", edited_by="ops-lead")
+
+    def test_ai_usage_notices_the_store_being_cleared(self):
+        """Reading .records directly skipped the reload check, so the usage
+        panel kept reporting calls from a file that no longer existed."""
+        with TemporaryDirectory() as folder:
+            path = Path(folder) / "ai_usage.json"
+            log = AiUsageLog(path)
+            log.add("acme", "candidate", "a-model", {"inputTokens": 10, "outputTokens": 5})
+            self.assertEqual(len(log.all()), 1)
+            path.unlink()
+            self.assertEqual(log.all(), [])
+            self.assertEqual(log.recent(), [])
 
     def test_drift_requires_repeated_failures(self):
         with TemporaryDirectory() as folder:

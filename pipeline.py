@@ -311,9 +311,18 @@ class AiUsageLog(JsonBacked):
         self._save()
         return record
 
-    def recent(self, limit: int = 10) -> list[AiCall]:
+    def all(self) -> list[AiCall]:
+        """Every call, re-read if the file changed underneath us.
+
+        Reading .records straight off the object skips that check, which is
+        how the usage panel kept reporting calls from a store that had since
+        been cleared.
+        """
         self._reload_if_changed()
-        return sorted(self.records, key=lambda item: item.called_at, reverse=True)[:limit]
+        return self.records
+
+    def recent(self, limit: int = 10) -> list[AiCall]:
+        return sorted(self.all(), key=lambda item: item.called_at, reverse=True)[:limit]
 
     def _save(self) -> None:
         with self._lock:
