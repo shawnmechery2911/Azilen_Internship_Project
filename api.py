@@ -11,13 +11,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from bedrock_proposer import make_adapter
-from pipeline import AiUsageLog, get_path, DriftTracker, ExceptionQueue, MappingStore, Pipeline, RuleBindingStore, SamplePayloadStore, ValidationRuleStore, apply_mapping, parse_input
+from pipeline import AiUsageLog, get_path, DriftTracker, ExceptionQueue, MappingStore, Pipeline, PayloadShape, RuleBindingStore, SamplePayloadStore, ValidationRuleStore, apply_mapping, parse_input
 
 ROOT = Path(__file__).resolve().parent
 app = FastAPI(title="Mapping Pipeline")
 store = MappingStore(ROOT / "mapping_store.json")
 queue = ExceptionQueue(ROOT / "exceptions.json")
 tracker = DriftTracker(path=ROOT / "drift_counts.json")
+shapes = PayloadShape(ROOT / "payload_shapes.json")
 rules_store = ValidationRuleStore(ROOT / "validation_rules.json")
 bindings = RuleBindingStore(ROOT / "rule_bindings.json")
 samples = SamplePayloadStore(ROOT / "sample_payloads.json")
@@ -272,7 +273,7 @@ def draft_mapping(ats: str, payload_type: str, body: DraftRequest):
 
 @app.post("/api/process")
 def process_payload(payload: dict):
-    pipeline = Pipeline(store, tracker)
+    pipeline = Pipeline(store, tracker, shapes)
     ats = payload.get("ats", "")
     payload_type = payload.get("payload_type", "")
     data = payload.get("data", {})

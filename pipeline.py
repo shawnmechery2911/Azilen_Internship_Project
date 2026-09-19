@@ -768,9 +768,15 @@ class MappingDraft:
 
 
 class Pipeline:
-    def __init__(self, store: MappingStore, drift_tracker: DriftTracker | None = None) -> None:
+    def __init__(
+        self,
+        store: MappingStore,
+        drift_tracker: DriftTracker | None = None,
+        shapes: PayloadShape | None = None,
+    ) -> None:
         self.store = store
         self.drift_tracker = drift_tracker
+        self.shapes = shapes
 
     def process(
         self,
@@ -818,7 +824,20 @@ class Pipeline:
 
         issues.extend(self._validate(mapped, rules, {issue["field"] for issue in issues}))
         status = "exception" if issues else "processed"
-        drift_alerts = self.drift_tracker.record(ats, payload_type, issues) if self.drift_tracker else []
+
+        # Drift is the partner's payload changing shape, which is visible on a
+        # clean order too - a new field they have started sending breaks
+        # nothing and is still worth knowing. Repeated failures stay as a
+        # second signal for the cases a shape comparison cannot see, such as
+        # values that have started failing validation.
+        drift_alerts: list[dict[str, str]] = []
+        if self.shapes:
+            change = self.shapes.compare(ats, payload)
+            sources = {item.source for item in mapping.mappings}
+            drift_alerts.extend(describe_shape_change(change, sources))
+            self.shapes.record(ats, payload)
+        if self.drift_tracker:
+            drift_alerts.extend(self.drift_tracker.record(ats, payload_type, issues))
         return ProcessingResult(status, mapped, issues, mapping.version, drift_alerts)
 
     def _validate(
@@ -1017,6 +1036,130 @@ class LLMMappingDraft:
             {"field": destination, "reason": next(item["reason"] for item in self.abstentions if item["destination"] == destination)}
             for destination in destinations - mapped
         ]
+
+
+def payload_paths(node: Any, prefix: str = "") -> set[str]:
+    """Every path a value sits at, which is what a payload's shape is."""
+    if isinstance(node, list):
+        found: set[str] = set()
+        for item in node:
+            found |= payload_paths(item, prefix)
+        return found or ({prefix} if prefix else set())
+    if isinstance(node, dict):
+        found = set()
+        for key, value in node.items():
+            found |= payload_paths(value, f"{prefix}.{key}" if prefix else key)
+        return found
+    return {prefix} if prefix else set()
+
+
+class PayloadShape(JsonBacked):
+    """What a partner's payloads have looked like, so a change is visible.
+
+    Drift is the partner changing their payload, not an order failing. A field
+    that arrived in every order until today has gone; a path nobody has seen
+    before has appeared; both together are a rename. None of that is legible
+    from validation failures alone - a rename and a removal fail identically,
+    and a new field fails not at all while still being the thing you want to
+    know about.
+
+    Per partner: how many payloads have been seen, and how many of them
+    carried each path.
+    """
+
+    def __init__(self, path: str | Path = "payload_shapes.json") -> None:
+        self.path = Path(path)
+        self._lock = threading.Lock()
+        self.shapes: dict[str, dict[str, Any]] = {}
+        self._stamp: tuple[int, int] | None = None
+        self._load()
+
+    def _load(self) -> None:
+        self._stamp = file_stamp(self.path)
+        if not self.path.exists() or not self.path.read_text(encoding="utf-8").strip():
+            self.shapes = {}
+            return
+        self.shapes = json.loads(self.path.read_text(encoding="utf-8"))
+
+    def compare(self, ats: str, payload: dict[str, Any]) -> dict[str, list[str]]:
+        """What changed about this payload's shape, without recording it.
+
+        A path counts as gone only if it was in *every* payload seen so far:
+        a field that comes and goes was never a promise, and calling that
+        drift is how an alert becomes noise nobody reads.
+        """
+        self._reload_if_changed()
+        known = self.shapes.get(ats)
+        if not known or known.get("payloads", 0) == 0:
+            return {"gone": [], "new": []}
+        here = payload_paths(payload)
+        total = known["payloads"]
+        counts: dict[str, int] = known.get("paths", {})
+        gone = sorted(p for p, seen in counts.items() if seen == total and p not in here)
+        new = sorted(p for p in here if p not in counts)
+        return {"gone": gone, "new": new}
+
+    def record(self, ats: str, payload: dict[str, Any]) -> None:
+        self._reload_if_changed()
+        known = self.shapes.setdefault(ats, {"payloads": 0, "paths": {}})
+        known["payloads"] += 1
+        counts = known["paths"]
+        for path in payload_paths(payload):
+            counts[path] = counts.get(path, 0) + 1
+        self._save()
+
+    def _save(self) -> None:
+        with self._lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(self.shapes, indent=2), encoding="utf-8")
+        self._stamp = file_stamp(self.path)
+
+
+def describe_shape_change(
+    change: dict[str, list[str]], mapped_sources: set[str]
+) -> list[dict[str, str]]:
+    """Turn a shape change into what a reviewer needs to act on.
+
+    A path that vanished and an unfamiliar one that appeared in the same
+    payload is a rename far more often than it is a coincidence, and saying
+    so is the difference between "a field is missing" and "they renamed it
+    to this, shall I remap it?". Only paths the mapping actually reads are
+    worth alerting on; the rest is the partner's business.
+    """
+    gone = [path for path in change["gone"] if path in mapped_sources]
+    new = change["new"]
+    alerts: list[dict[str, str]] = []
+    for path in gone:
+        tail = path.rsplit(".", 1)[-1].lower()
+        likely = [
+            candidate
+            for candidate in new
+            if candidate.rsplit(".", 1)[0] == path.rsplit(".", 1)[0]
+            or tail[:4] in candidate.rsplit(".", 1)[-1].lower()
+        ]
+        if len(likely) == 1:
+            alerts.append({
+                "field": path,
+                "kind": "renamed",
+                "became": likely[0],
+                "message": f"{path} is gone and {likely[0]} appeared - likely renamed",
+            })
+        else:
+            alerts.append({
+                "field": path,
+                "kind": "removed",
+                "became": "",
+                "message": f"{path} has arrived in every order until now and is absent",
+            })
+    for path in new:
+        if not any(alert.get("became") == path for alert in alerts):
+            alerts.append({
+                "field": path,
+                "kind": "added",
+                "became": "",
+                "message": f"{path} is new - this partner has not sent it before",
+            })
+    return alerts
 
 
 class DriftTracker(JsonBacked):

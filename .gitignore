@@ -24,6 +24,7 @@ validation_rules.json
 drift_counts.json
 rule_bindings.json
 sample_payloads.json
+payload_shapes.json
 *.log
 
 demo-data/

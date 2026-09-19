@@ -17,6 +17,7 @@ from pipeline import (
     LLMMappingDraft,
     MappingDraft,
     MappingStore,
+    PayloadShape,
     Pipeline,
     AiUsageLog,
     RuleBindingStore,
@@ -194,6 +195,65 @@ class PipelineTests(unittest.TestCase):
             path.unlink()
             self.assertEqual(log.all(), [])
             self.assertEqual(log.recent(), [])
+
+    def approved(self, folder, rows):
+        store = MappingStore(Path(folder) / "mappings.json")
+        store.add_draft("ats", "candidate", rows, proposed_by="bedrock")
+        store.approve("ats", "candidate", 1, "reviewer")
+        return store
+
+    def test_a_field_that_stops_arriving_is_drift(self):
+        """Not an order failing - the partner no longer sending something they
+        have sent every time until now."""
+        with TemporaryDirectory() as folder:
+            store = self.approved(folder, [FieldMapping("Person.ApplicantID", "Applicant.ApplicantId", True)])
+            shapes = PayloadShape(Path(folder) / "shapes.json")
+            pipeline = Pipeline(store, shapes=shapes)
+            for _ in range(3):
+                pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1"}})
+            result = pipeline.process("ats", "candidate", {"Person": {}})
+            kinds = {(a["kind"], a["field"]) for a in result.drift_alerts}
+            self.assertIn(("removed", "Person.ApplicantID"), kinds)
+
+    def test_a_renamed_field_is_reported_as_a_rename(self):
+        """Gone and arrived in the same payload. Reported as two unrelated
+        facts it is a puzzle; reported as a rename it is a fix."""
+        with TemporaryDirectory() as folder:
+            store = self.approved(folder, [FieldMapping("Person.ApplicantID", "Applicant.ApplicantId", True)])
+            shapes = PayloadShape(Path(folder) / "shapes.json")
+            pipeline = Pipeline(store, shapes=shapes)
+            for _ in range(3):
+                pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1"}})
+            result = pipeline.process("ats", "candidate", {"Person": {"CandidateID": "A1"}})
+            rename = next(a for a in result.drift_alerts if a["kind"] == "renamed")
+            self.assertEqual(rename["field"], "Person.ApplicantID")
+            self.assertEqual(rename["became"], "Person.CandidateID")
+
+    def test_a_new_field_is_drift_even_when_nothing_fails(self):
+        """A partner who starts sending a phone number breaks nothing, and it
+        is still the thing you want to know."""
+        with TemporaryDirectory() as folder:
+            store = self.approved(folder, [FieldMapping("Person.ApplicantID", "Applicant.ApplicantId", True)])
+            shapes = PayloadShape(Path(folder) / "shapes.json")
+            pipeline = Pipeline(store, shapes=shapes)
+            for _ in range(3):
+                pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1"}})
+            result = pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1", "Phone": "0123456789"}})
+            self.assertEqual(result.status, "processed")
+            added = next(a for a in result.drift_alerts if a["kind"] == "added")
+            self.assertEqual(added["field"], "Person.Phone")
+
+    def test_a_field_that_comes_and_goes_is_not_drift(self):
+        """It was never a promise, and alerting on it is how an alert becomes
+        noise nobody reads."""
+        with TemporaryDirectory() as folder:
+            store = self.approved(folder, [FieldMapping("Person.ApplicantID", "Applicant.ApplicantId", True)])
+            shapes = PayloadShape(Path(folder) / "shapes.json")
+            pipeline = Pipeline(store, shapes=shapes)
+            pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1", "Middle": "Q"}})
+            pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1"}})
+            result = pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1"}})
+            self.assertEqual([a for a in result.drift_alerts if a["field"] == "Person.Middle"], [])
 
     def test_drift_requires_repeated_failures(self):
         with TemporaryDirectory() as folder:
