@@ -1002,3 +1002,19 @@ button.row:hover .row-action {
   font-size: var(--fs-meta);
   font-weight: 500;
 }
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: var(--fs-meta);
+  font-weight: 600;
+}
+.back-link:hover {
+  color: var(--accent-hover);
+}

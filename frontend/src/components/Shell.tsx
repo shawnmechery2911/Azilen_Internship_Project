@@ -33,12 +33,14 @@ export function Shell({
   children,
   apiUp = true,
   openExceptions = 0,
+  crumb,
 }: {
   activeNav: string;
   onNavigate: (screen: string) => void;
   children: ReactNode;
   apiUp?: boolean;
   openExceptions?: number;
+  crumb?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(storedTheme);
@@ -113,7 +115,7 @@ export function Shell({
           <div className="breadcrumbs">
             <span>Operations</span>
             <span>/</span>
-            <strong>{activeNav}</strong>
+            <strong>{crumb ?? activeNav}</strong>
           </div>
           <div className="topbar-actions">
             <button

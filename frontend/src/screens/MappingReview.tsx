@@ -139,7 +139,9 @@ export function MappingReviewScreen({
     <div className="page-wrap">
       <section className="page-heading">
         <div>
-          <div className="eyebrow">Mapping review</div>
+          <button className="back-link" onClick={onDone}>
+            <span aria-hidden="true">‹</span> Back to overview
+          </button>
           <h1>
             {ats} · v{version}
           </h1>

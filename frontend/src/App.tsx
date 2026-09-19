@@ -62,6 +62,7 @@ function App() {
     <Shell
       activeNav={screen === "Review" ? "Overview" : screen}
       onNavigate={navigate}
+      crumb={screen === "Review" ? "Mapping review" : undefined}
       apiUp={apiUp}
       openExceptions={openCount}
     >
