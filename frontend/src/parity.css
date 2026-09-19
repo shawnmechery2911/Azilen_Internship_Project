@@ -1342,3 +1342,68 @@ button.row:hover .row-action {
 .process-controls select {
   flex: 0 1 190px;
 }
+
+/* --- drift ------------------------------------------------------------------
+   A rename already knows what the field became, so the action is a
+   substitution. Anything else goes back to the model.
+   --------------------------------------------------------------------------- */
+.drift-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.drift {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  font-size: var(--fs-meta);
+}
+.drift-kind {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: var(--fs-label);
+  font-weight: 700;
+  text-transform: lowercase;
+}
+.drift-message {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.drift-renamed {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+.drift-renamed .drift-kind {
+  background: var(--amber);
+  color: var(--on-accent);
+}
+.drift-removed,
+.drift-changed {
+  border-color: var(--red-line);
+  border-left-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+}
+.drift-removed .drift-kind,
+.drift-changed .drift-kind {
+  background: var(--red);
+  color: var(--on-accent);
+}
+.drift-added {
+  border-color: var(--accent-line);
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.drift-added .drift-kind {
+  background: var(--accent);
+  color: var(--on-accent);
+}

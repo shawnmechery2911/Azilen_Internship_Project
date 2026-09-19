@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +49,12 @@ class AssignRequest(BaseModel):
 
 class ParseRequest(BaseModel):
     text: str
+
+
+class RemapRequest(BaseModel):
+    from_source: str
+    to_source: str
+    proposed_by: str = "drift"
 
 
 class MappingEdit(BaseModel):
@@ -171,6 +177,28 @@ def partner_source_fields(ats: str):
                 if not row.source.startswith("Static:") and row.source not in seen:
                     seen.append(row.source)
     return [{"path": path, "example": examples.get(path)} for path in sorted(seen)]
+
+
+@app.post("/api/mappings/{ats}/{payload_type}/remap")
+def remap_source(ats: str, payload_type: str, body: RemapRequest):
+    """Point every rule reading one source at another, as a new draft.
+
+    Drift told us the partner renamed a field. Acting on that is a mechanical
+    substitution, not a question for the model - and it is a new version
+    rather than an edit, because the approved one is what production is
+    running and what earlier orders were mapped with.
+    """
+    current = store.get(ats, payload_type)
+    if current is None:
+        raise HTTPException(404, "No approved mapping to remap")
+    rows = [
+        replace(row, source=body.to_source) if row.source == body.from_source else row
+        for row in current.mappings
+    ]
+    if rows == current.mappings:
+        raise HTTPException(400, f"No rule reads {body.from_source}")
+    version = store.add_draft(ats, payload_type, rows, proposed_by=body.proposed_by)
+    return {"version": version.version}
 
 
 @app.patch("/api/mappings/{ats}/{payload_type}/{version}/mapping")

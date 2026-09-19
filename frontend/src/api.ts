@@ -67,12 +67,18 @@ export interface AiUsage {
   orders_processed: number;
   recent: { model: string; input_tokens: number; output_tokens: number }[];
 }
+export interface DriftAlert {
+  field: string;
+  message: string;
+  kind?: "renamed" | "removed" | "added";
+  became?: string;
+}
 export interface ProcessResult {
   status: string;
   mapped_payload: Record<string, unknown>;
   issues: { field: string; message: string; group?: string; rule_id?: string }[];
   mapping_version: number | null;
-  drift_alerts: { field: string; message: string }[];
+  drift_alerts: DriftAlert[];
   processed_at: string;
 }
 export interface DraftResult {
@@ -178,6 +184,17 @@ export function getValidationRules(ats?: string): Promise<ValidationRule[]> {
 export interface PartnerSample {
   label: string;
   data: Record<string, unknown>;
+}
+export function remapSource(
+  ats: string,
+  payloadType: string,
+  fromSource: string,
+  toSource: string,
+): Promise<{ version: number }> {
+  return request(`/mappings/${ats}/${payloadType}/remap`, {
+    method: "POST",
+    body: JSON.stringify({ from_source: fromSource, to_source: toSource }),
+  });
 }
 export function getPartnerSamples(ats: string): Promise<PartnerSample[]> {
   return request(`/partners/${ats}/samples`);

@@ -243,6 +243,28 @@ class PipelineTests(unittest.TestCase):
             added = next(a for a in result.drift_alerts if a["kind"] == "added")
             self.assertEqual(added["field"], "Person.Phone")
 
+    def test_drift_keeps_reporting_until_the_mapping_is_updated(self):
+        """Folding a drifted payload into the baseline would make the old field
+        look merely optional, and the alert would disappear because nobody
+        acted on it."""
+        with TemporaryDirectory() as folder:
+            store = self.approved(folder, [FieldMapping("Person.ApplicantID", "Applicant.ApplicantId", True)])
+            shapes = PayloadShape(Path(folder) / "shapes.json")
+            pipeline = Pipeline(store, shapes=shapes)
+            for _ in range(3):
+                pipeline.process("ats", "candidate", {"Person": {"ApplicantID": "A1"}})
+            renamed = {"Person": {"CandidateID": "A1"}}
+            for _ in range(3):
+                result = pipeline.process("ats", "candidate", renamed)
+                self.assertTrue(any(a["kind"] == "renamed" for a in result.drift_alerts))
+
+            # remap, and the same payload stops being news
+            store.add_draft("ats", "candidate", [FieldMapping("Person.CandidateID", "Applicant.ApplicantId", True)], proposed_by="drift")
+            store.approve("ats", "candidate", 2, "reviewer")
+            after = pipeline.process("ats", "candidate", renamed)
+            self.assertEqual(after.drift_alerts, [])
+            self.assertEqual(after.status, "processed")
+
     def test_a_field_that_comes_and_goes_is_not_drift(self):
         """It was never a promise, and alerting on it is how an alert becomes
         noise nobody reads."""

@@ -834,8 +834,16 @@ class Pipeline:
         if self.shapes:
             change = self.shapes.compare(ats, payload)
             sources = {item.source for item in mapping.mappings}
-            drift_alerts.extend(describe_shape_change(change, sources))
-            self.shapes.record(ats, payload)
+            shape_alerts = describe_shape_change(change, sources)
+            drift_alerts.extend(shape_alerts)
+            # A payload that drifted is not folded into the baseline. Recording
+            # it would teach the shape that the old field is merely optional
+            # now, and the alert would vanish because nobody looked - the
+            # change normalising itself is the one outcome worth preventing.
+            # Once the mapping is updated the change stops being reported, and
+            # the new shape is learned from the next order.
+            if not shape_alerts:
+                self.shapes.record(ats, payload)
         if self.drift_tracker:
             drift_alerts.extend(self.drift_tracker.record(ats, payload_type, issues))
         return ProcessingResult(status, mapped, issues, mapping.version, drift_alerts)
@@ -1152,6 +1160,10 @@ def describe_shape_change(
                 "message": f"{path} has arrived in every order until now and is absent",
             })
     for path in new:
+        # A new path the mapping already reads is not news - it is the field
+        # we were just told to remap to, now being read.
+        if path in mapped_sources:
+            continue
         if not any(alert.get("became") == path for alert in alerts):
             alerts.append({
                 "field": path,

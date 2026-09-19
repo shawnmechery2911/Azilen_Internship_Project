@@ -4,6 +4,7 @@ import {
   getMapping,
   getPartners,
   getPartnerSamples,
+  remapSource,
   runProcess,
   type Partner,
   type PartnerSample,
@@ -91,6 +92,27 @@ export function ProcessPanel({
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Processing failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Drift already worked out what the field became, so acting on it is a
+   *  substitution rather than another question for the model. */
+  async function remap(from: string, to: string) {
+    if (!partner) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { version } = await remapSource(
+        partner.ats,
+        partner.payload_type,
+        from,
+        to,
+      );
+      onReview(partner.ats, partner.payload_type, version);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remap that field");
     } finally {
       setBusy(false);
     }
@@ -212,15 +234,35 @@ export function ProcessPanel({
               </div>
               {result.issues.length > 0 && <IssueList issues={result.issues} />}
               {result.drift_alerts.length > 0 && (
-                <div className="warning-text">
-                  The same field has failed repeatedly.
-                  <button
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => void requestRepair()}
-                  >
-                    Request updated mapping
-                  </button>
+                <div className="drift-list">
+                  {result.drift_alerts.map((alert, index) => (
+                    <div
+                      className={`drift drift-${alert.kind ?? "changed"}`}
+                      key={`${alert.field}-${index}`}
+                    >
+                      <span className="drift-kind">
+                        {alert.kind ?? "changed"}
+                      </span>
+                      <span className="drift-message">{alert.message}</span>
+                      {alert.kind === "renamed" && alert.became ? (
+                        <button
+                          className="secondary-button"
+                          disabled={busy}
+                          onClick={() => void remap(alert.field, alert.became!)}
+                        >
+                          Remap to {alert.became}
+                        </button>
+                      ) : (
+                        <button
+                          className="secondary-button"
+                          disabled={busy}
+                          onClick={() => void requestRepair()}
+                        >
+                          Ask for a new mapping
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
