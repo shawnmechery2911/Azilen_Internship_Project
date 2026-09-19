@@ -592,10 +592,12 @@ class Pipeline:
         rules: Iterable[ValidationRule] = (),
     ) -> ProcessingResult:
         payload = parse_input(payload)
+        rules = list(rules)
         mapping = self.store.get(ats, payload_type)
         if mapping is None:
             return ProcessingResult("needs_mapping", {}, [{"field": "_mapping", "message": "No approved mapping exists"}], None)
 
+        presence = presence_rules(rules)
         mapped: dict[str, Any] = {}
         issues: list[dict[str, str]] = []
         for item in mapping.mappings:
@@ -608,7 +610,7 @@ class Pipeline:
                     issues.append({"field": item.destination, "message": f"Source field is missing: {item.source}", "group": "Mapping"})
                 continue
             if missing:
-                if item.required or not item.source_is_list:
+                if is_presence_required(item, presence):
                     issues.append({"field": item.destination, "message": f"Source field is missing: {item.source}", "group": "Mapping"})
                 continue
             if isinstance(value, list) and not item.source_is_list:
@@ -676,6 +678,38 @@ class Pipeline:
 
 def _issue(rule: ValidationRule, message: str) -> dict[str, str]:
     return {"field": rule.field, "message": message, "rule_id": rule.id, "group": rule.group}
+
+
+def presence_rules(rules: Iterable[ValidationRule]) -> dict[str, bool]:
+    """Which destinations have a rule speaking for presence, and its answer.
+
+    Only Completeness rules say whether a field has to be there. A Format or
+    Business rule constrains the value when one is present and says nothing
+    about whether it must be - reading those as "optional" would quietly stop
+    required fields being reported.
+
+    A destination with several Completeness rules is required if any enabled
+    one says so.
+    """
+    presence: dict[str, bool] = {}
+    for rule in rules:
+        if rule.enabled and rule.group == "Completeness":
+            presence[rule.field] = presence.get(rule.field, False) or rule.required
+    return presence
+
+
+def is_presence_required(item: FieldMapping, presence: dict[str, bool]) -> bool:
+    """Whether a missing source value is worth reporting.
+
+    A validation rule covering the destination is the authority, so the
+    "must be present" toggle on the Validation screen genuinely governs
+    presence. Without that, a field marked required on the mapping would
+    fail whatever the toggle said, and the toggle would look broken.
+    Destinations no rule covers keep the mapping's own required flag.
+    """
+    if item.destination in presence:
+        return presence[item.destination]
+    return item.required or not item.source_is_list
 
 
 def static_value(source: str) -> str:

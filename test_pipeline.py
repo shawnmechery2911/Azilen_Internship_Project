@@ -1,6 +1,7 @@
 import io
 import os
 import unittest
+from dataclasses import replace
 import json
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -205,6 +206,60 @@ class PipelineTests(unittest.TestCase):
             result = Pipeline(store).process("ats", "candidate", {"Person": {"First": "Ada"}}, rules)
             self.assertEqual([issue["field"] for issue in result.issues], ["Applicant.Email"])
             self.assertEqual(result.issues[0]["group"], "Completeness")
+
+    def test_the_required_toggle_beats_the_mappings_own_required_flag(self):
+        """The Validation screen's "must be present" toggle has to win, or it
+        looks broken: the field is required on the mapping too, and that check
+        used to fire whatever the rule said."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.SSN", "Applicant.SSN", True)], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            pipeline = Pipeline(store)
+            rule = ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "an SSN", required=True)
+
+            demanded = pipeline.process("ats", "candidate", {"Person": {}}, [rule])
+            self.assertEqual(demanded.status, "exception")
+            self.assertEqual([i["field"] for i in demanded.issues], ["Applicant.SSN"])
+
+            relaxed = pipeline.process("ats", "candidate", {"Person": {}}, [replace(rule, required=False)])
+            self.assertEqual(relaxed.status, "processed")
+            self.assertEqual(relaxed.issues, [])
+
+    def test_a_field_no_rule_covers_keeps_the_mapping_flag(self):
+        """Turning presence over to the rules must not make uncovered fields
+        silently optional."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.First", "Applicant.GivenName", True)], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            unrelated = ValidationRule("email_present", "Applicant.Email", "Completeness", "an email", required=False)
+            result = Pipeline(store).process("ats", "candidate", {"Person": {}}, [unrelated])
+            self.assertEqual(result.status, "exception")
+            self.assertEqual([i["field"] for i in result.issues], ["Applicant.GivenName"])
+
+    def test_a_format_rule_does_not_make_a_required_field_optional(self):
+        """A Format rule constrains the value when there is one. It must not be
+        read as saying the field may be absent - that silently stopped
+        FCRAPermissibleType being reported on the incomplete fixture."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.Purpose", "FCRAPermissibleType", True)], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            fmt = ValidationRule("purpose_enum", "FCRAPermissibleType", "Format", "a purpose", allowed_values=("Volunteer",))
+            result = Pipeline(store).process("ats", "candidate", {"Person": {}}, [fmt])
+            self.assertEqual(result.status, "exception")
+            self.assertEqual([i["field"] for i in result.issues], ["FCRAPermissibleType"])
+
+    def test_a_disabled_presence_rule_does_not_govern(self):
+        """A rule switched off entirely should not quietly relax the mapping."""
+        with TemporaryDirectory() as folder:
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [FieldMapping("Person.SSN", "Applicant.SSN", True)], proposed_by="author")
+            store.approve("ats", "candidate", 1, "reviewer")
+            off = ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "an SSN", required=True, enabled=False)
+            result = Pipeline(store).process("ats", "candidate", {"Person": {}}, [off])
+            self.assertEqual(result.status, "exception")
 
     def test_drift_tracker_is_wired_into_processing(self):
         with TemporaryDirectory() as folder:
