@@ -175,6 +175,13 @@ export function getValidationRules(ats?: string): Promise<ValidationRule[]> {
     `/validation-rules${ats ? `?ats=${encodeURIComponent(ats)}` : ""}`,
   );
 }
+export interface PartnerSample {
+  label: string;
+  data: Record<string, unknown>;
+}
+export function getPartnerSamples(ats: string): Promise<PartnerSample[]> {
+  return request(`/partners/${ats}/samples`);
+}
 export function getPartnerSourceFields(ats: string): Promise<string[]> {
   return request(`/partners/${ats}/source-fields`);
 }

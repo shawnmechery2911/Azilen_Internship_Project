@@ -1,52 +1,92 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   draftMapping,
-  getFixtures,
   getMapping,
+  getPartners,
+  getPartnerSamples,
   runProcess,
-  type FixturePayload,
+  type Partner,
+  type PartnerSample,
   type ProcessResult,
 } from "../api";
-import { ErrorPanel, Loading } from "./ScreenState";
-import { PayloadView } from "./PayloadView";
+import { ErrorPanel } from "./ScreenState";
 import { IssueList } from "./IssueList";
+import { PayloadView } from "./PayloadView";
+
+/** Drop a field the mapping depends on, so the order fails. Reaching drift
+ *  means failing the same field repeatedly, and hand-editing JSON between
+ *  runs is not something to do in front of an audience. */
+function damage(payload: Record<string, unknown>): Record<string, unknown> {
+  const copy: Record<string, unknown> = JSON.parse(JSON.stringify(payload));
+  for (const value of Object.values(copy)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const inner = value as Record<string, unknown>;
+      const victim = Object.keys(inner).find((key) => /name|email|id/i.test(key));
+      if (victim) {
+        delete inner[victim];
+        return copy;
+      }
+    }
+  }
+  const top = Object.keys(copy).find((key) => /account|package|name/i.test(key));
+  if (top) delete copy[top];
+  return copy;
+}
 
 export function ProcessPanel({
   onReview,
 }: {
   onReview: (ats: string, payloadType: string, version: number) => void;
 }) {
-  const [fixtures, setFixtures] = useState<FixturePayload[]>([]);
-  const [selected, setSelected] = useState("");
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [ats, setAts] = useState("");
+  const [samples, setSamples] = useState<PartnerSample[]>([]);
+  const [chosen, setChosen] = useState("");
+  const [breakIt, setBreakIt] = useState(false);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
-    try {
-      const next = await getFixtures();
-      setFixtures(next);
-      setSelected(next[0]?.name ?? "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load fixtures");
-    }
-  }
+  useEffect(() => {
+    void getPartners()
+      .then((found) => {
+        // only a partner with an approved mapping can be sent an order
+        const usable = found.filter((item) => item.version !== null);
+        setPartners(usable);
+        setAts((current) => current || usable[0]?.ats || "");
+      })
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Could not load partners"),
+      );
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, []);
-  const fixture = fixtures.find((item) => item.name === selected);
+    if (!ats) return;
+    setResult(null);
+    void getPartnerSamples(ats)
+      .then((found) => {
+        setSamples(found);
+        setChosen(found[0]?.label ?? "");
+      })
+      .catch(() => setSamples([]));
+  }, [ats]);
+
+  const partner = useMemo(
+    () => partners.find((item) => item.ats === ats),
+    [partners, ats],
+  );
+  const sample = samples.find((item) => item.label === chosen);
 
   async function run() {
-    if (!fixture) return;
+    if (!partner || !sample) return;
     setBusy(true);
     setError("");
     try {
       setResult(
         await runProcess({
-          ats: fixture.ats,
-          payload_type: fixture.payload_type,
-          data: fixture.data,
+          ats: partner.ats,
+          payload_type: partner.payload_type,
+          data: breakIt ? damage(sample.data) : sample.data,
         }),
       );
     } catch (err) {
@@ -57,86 +97,142 @@ export function ProcessPanel({
   }
 
   async function requestRepair() {
-    if (!fixture) return;
+    if (!partner || !sample) return;
     setBusy(true);
     setError("");
     try {
-      const current = await getMapping(fixture.ats, fixture.payload_type);
+      const current = await getMapping(partner.ats, partner.payload_type);
       const draft = await draftMapping(
-        fixture.ats,
-        fixture.payload_type,
-        fixture.data,
+        partner.ats,
+        partner.payload_type,
+        breakIt ? damage(sample.data) : sample.data,
         current.mappings.map((item) => item.destination),
       );
-      onReview(fixture.ats, fixture.payload_type, draft.version);
+      onReview(partner.ats, partner.payload_type, draft.version);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not request mapping",
+        err instanceof Error ? err.message : "Could not request a mapping",
       );
     } finally {
       setBusy(false);
     }
   }
 
-  if (error && !fixtures.length)
-    return <ErrorPanel message={error} retry={() => void load()} />;
-  if (!fixtures.length)
-    return <Loading label="Loading stored demo payloads..." rows={2} />;
+  if (error && !partners.length)
+    return <ErrorPanel message={error} retry={() => window.location.reload()} />;
+
   return (
     <section className="panel process-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Send a test order</h2>
-        </div>
+      <div className="panel-head-row">
+        <h2>Send a test order</h2>
         <span className="status-pill">No model call</span>
       </div>
-      <div className="process-controls">
-        <select
-          value={selected}
-          onChange={(event) => setSelected(event.target.value)}
-        >
-          {fixtures.map((item) => (
-            <option key={item.name}>{item.name}</option>
-          ))}
-        </select>
-        <button
-          className="primary-button"
-          disabled={busy}
-          onClick={() => void run()}
-        >
-          {busy ? "Processing..." : "Run payload"}
-        </button>
-      </div>
-      {error && <div className="toast">{error}</div>}
-      {result && (
-        <div className="process-result">
-          <div className={`result-banner result-${result.status}`}>
-            <strong>{result.status === "processed" ? "Processed" : "Exception"}</strong>
-            <span>
-              mapping v{result.mapping_version ?? "none"} · {result.issues.length} issue
-              {result.issues.length === 1 ? "" : "s"} · 0 AI calls
-            </span>
+
+      {partners.length === 0 ? (
+        <p className="empty-note">
+          No partner has an approved mapping yet, so there is nothing to send an
+          order to.
+        </p>
+      ) : (
+        <>
+          <div className="process-controls">
+            <label className="sr-only" htmlFor="test-partner">
+              Partner
+            </label>
+            <select
+              id="test-partner"
+              value={ats}
+              onChange={(event) => setAts(event.target.value)}
+            >
+              {partners.map((item) => (
+                <option key={item.ats} value={item.ats}>
+                  {item.ats}
+                </option>
+              ))}
+            </select>
+
+            <label className="sr-only" htmlFor="test-payload">
+              Order
+            </label>
+            <select
+              id="test-payload"
+              value={chosen}
+              onChange={(event) => setChosen(event.target.value)}
+              disabled={!samples.length}
+            >
+              {samples.length ? (
+                samples.map((item) => (
+                  <option key={item.label} value={item.label}>
+                    {item.label}
+                  </option>
+                ))
+              ) : (
+                <option value="">no stored orders yet</option>
+              )}
+            </select>
+
+            <label className="break-toggle">
+              <input
+                type="checkbox"
+                checked={breakIt}
+                onChange={(event) => setBreakIt(event.target.checked)}
+              />
+              drop a field
+            </label>
+
+            <button
+              className="primary-button"
+              disabled={busy || !sample}
+              onClick={() => void run()}
+            >
+              {busy ? "Running..." : "Run payload"}
+            </button>
           </div>
-          {result.issues.length > 0 && <IssueList issues={result.issues} />}
-          {result.drift_alerts.length > 0 && (
-            <div className="warning-text">
-              Drift alert: repeated failures detected.{" "}
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => void requestRepair()}
-              >
-                Request updated mapping
-              </button>
+
+          {!samples.length && (
+            <p className="empty-note">
+              Nothing from {ats} has been kept yet, so there is no order to
+              replay.
+            </p>
+          )}
+          {error && <div className="toast">{error}</div>}
+
+          {result && (
+            <div className="process-result">
+              <div className={`banner banner-${result.status}`}>
+                <strong>
+                  {result.status === "processed" ? "Processed" : "Exception"}
+                </strong>
+                <span>
+                  mapping v{result.mapping_version ?? "none"} ·{" "}
+                  {result.issues.length} issue
+                  {result.issues.length === 1 ? "" : "s"} ·{" "}
+                  <strong>0 AI calls</strong>
+                </span>
+              </div>
+              {result.issues.length > 0 && <IssueList issues={result.issues} />}
+              {result.drift_alerts.length > 0 && (
+                <div className="warning-text">
+                  The same field has failed repeatedly.
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() => void requestRepair()}
+                  >
+                    Request updated mapping
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-      {result && fixture && (
-        <PayloadView
-          sample={{ ats: fixture.ats, label: fixture.name, data: fixture.data }}
-          result={result}
-        />
+
+          {result && sample && (
+            <PayloadView
+              sample={{ ats, label: chosen, data: sample.data }}
+              result={result}
+            />
+          )}
+        </>
       )}
     </section>
   );

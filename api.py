@@ -122,6 +122,21 @@ def replay_label(ats: str, index: int) -> str:
     return f"stored order {index + 1}"
 
 
+@app.get("/api/partners/{ats}/samples")
+def partner_samples(ats: str):
+    """Orders this partner has actually sent, to send again as a test.
+
+    The test panel used to offer fixture files tied to two seeded partner
+    names, so for any partner onboarded through the UI it sent an order to
+    an ats that did not exist.
+    """
+    payloads = replay_payloads_for(ats)
+    return [
+        {"label": replay_label(ats, index), "data": payload}
+        for index, payload in enumerate(payloads)
+    ]
+
+
 @app.get("/api/partners/{ats}/source-fields")
 def partner_source_fields(ats: str):
     """The paths this partner's own payloads actually contain.
