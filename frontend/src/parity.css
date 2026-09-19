@@ -559,3 +559,153 @@ button.mapping-list-row:hover {
 .page-wrap-tight {
   padding-top: 0;
 }
+
+/* --- mapping review ---------------------------------------------------------
+   The verdict is the headline: a reviewer's first question is whether this can
+   go live, not what the rules are.
+   --------------------------------------------------------------------------- */
+.verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 15px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  margin-bottom: 14px;
+}
+.verdict strong {
+  font-size: var(--fs-h3);
+}
+.verdict span {
+  font-size: var(--fs-meta);
+}
+.verdict-safe {
+  border-color: var(--green-line);
+  border-left-color: var(--green);
+  background: var(--green-soft);
+}
+.verdict-safe strong,
+.verdict-safe span {
+  color: var(--green);
+}
+.verdict-blocked {
+  border-color: var(--red-line);
+  border-left-color: var(--red);
+  background: var(--red-soft);
+}
+.verdict-blocked strong,
+.verdict-blocked span {
+  color: var(--red);
+}
+.verdict-unknown {
+  border-color: var(--amber);
+  border-left-color: var(--amber);
+  background: var(--amber-soft);
+}
+.verdict-unknown strong,
+.verdict-unknown span {
+  color: var(--amber);
+}
+
+.coverage {
+  display: flex;
+  gap: 32px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  margin-bottom: 14px;
+}
+.coverage strong {
+  display: block;
+  font-size: var(--fs-h2);
+  color: var(--text);
+}
+.coverage span {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+.map-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.map-row:first-of-type {
+  border-top: 0;
+}
+.map-line {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.map-dest {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  color: var(--text);
+}
+.map-arrow {
+  color: var(--muted-3);
+}
+.map-src {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  color: var(--code);
+}
+.map-sample {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.map-reason {
+  font-size: var(--fs-meta);
+  color: var(--muted-2);
+}
+.map-notes {
+  font-size: var(--fs-label);
+  color: var(--muted-3);
+}
+.map-empty {
+  margin: 0;
+  font-size: var(--fs-meta);
+  color: var(--muted-2);
+}
+.panel-subhead {
+  margin-top: 22px;
+}
+
+.approve-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.approve-bar label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+.approve-bar .reviewer-input {
+  margin: 0;
+}
+.approve-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.approve-reason {
+  font-size: var(--fs-meta);
+  color: var(--muted-2);
+}
