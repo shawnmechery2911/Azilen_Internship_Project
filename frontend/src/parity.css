@@ -539,7 +539,7 @@ button.mapping-list-row:hover {
   height: 20px;
   border-radius: 999px;
   background: var(--border-strong, var(--border));
-  transition: background 0.16s ease;
+  transition: background var(--dur) var(--ease-in-out);
   pointer-events: none;
 }
 .switch .thumb {
@@ -550,7 +550,7 @@ button.mapping-list-row:hover {
   height: 14px;
   border-radius: 50%;
   background: var(--surface);
-  transition: transform 0.16s ease;
+  transition: transform var(--dur) var(--ease-snap);
   pointer-events: none;
 }
 .switch input:checked ~ .track {
@@ -1189,4 +1189,145 @@ button.row:hover .row-action {
 .map-edit .link-button {
   margin-left: 0;
   font-size: var(--fs-label);
+}
+
+/* --- motion -----------------------------------------------------------------
+   Everything that changes state gets a curve. Entrances decelerate, in-place
+   changes are symmetric, the toggle overshoots slightly and settles.
+   --------------------------------------------------------------------------- */
+.row,
+.icon-action,
+.link-button,
+.filter-group button,
+.primary-button,
+.secondary-button,
+.back-link,
+.nav-count,
+.status,
+.row-action {
+  transition:
+    background var(--dur-fast) var(--ease-in-out),
+    color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    opacity var(--dur-fast) var(--ease-in-out);
+}
+.primary-button:active,
+.secondary-button:active {
+  transform: scale(0.98);
+  transition: transform var(--dur-fast) var(--ease-snap);
+}
+.map-edit select,
+.map-edit input,
+.exception-actions input,
+.reviewer-input,
+.onboarding-form input {
+  transition:
+    border-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-fast) var(--ease-in-out);
+}
+.map-edit select:focus,
+.map-edit input:focus,
+.exception-actions input:focus,
+.reviewer-input:focus,
+.onboarding-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+/* a panel arriving, and rows arriving inside it */
+.panel,
+.verdict,
+.coverage,
+.exception-card {
+  animation: rise var(--dur-slow) var(--ease-out) both;
+}
+.row-expand {
+  animation: unfold var(--dur) var(--ease-out) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* --- skeleton ---------------------------------------------------------------
+   Shaped like the content it stands in for, so the layout does not jump when
+   the data lands. The sweep is a moving highlight rather than a pulse: a pulse
+   reads as a warning, a sweep reads as work in progress.
+   --------------------------------------------------------------------------- */
+.skeleton {
+  border-radius: 6px;
+  background:
+    linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--surface) 40%,
+        var(--surface) 60%,
+        transparent 100%
+      )
+      var(--surface-2);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: sweep 1.4s var(--ease-in-out) infinite;
+}
+@keyframes sweep {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+.skeleton-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 118px 64px;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.skeleton-row:first-of-type {
+  border-top: 0;
+}
+.skeleton-row span {
+  height: 11px;
+}
+.skeleton-title {
+  height: 15px;
+  width: 168px;
+  margin-bottom: 14px;
+}
+/* stagger, so rows arrive rather than all flashing together */
+.skeleton-row:nth-child(2) .skeleton {
+  animation-delay: 80ms;
+}
+.skeleton-row:nth-child(3) .skeleton {
+  animation-delay: 160ms;
+}
+.skeleton-row:nth-child(4) .skeleton {
+  animation-delay: 240ms;
+}
+.skeleton-row:nth-child(5) .skeleton {
+  animation-delay: 320ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .skeleton {
+    animation: none;
+    background: var(--surface-2);
+  }
 }

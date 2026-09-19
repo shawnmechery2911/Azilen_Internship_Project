@@ -173,7 +173,7 @@ export function MappingReviewScreen({
   if (!mapping)
     return (
       <div className="page-wrap">
-        <Loading label="Loading mapping review..." />
+        <Loading label="Loading mapping review..." rows={5} />
       </div>
     );
 

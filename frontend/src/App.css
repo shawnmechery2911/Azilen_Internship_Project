@@ -17,6 +17,20 @@
   --fs-label: 12px;
   --fs-display: 26px;
 
+  /* Motion. Four curves, each with a job, so nothing reaches for a bare
+     `ease` - which starts and stops at the same rate and reads mechanical.
+     out:   decelerate hard. Things arriving: panels, skeleton content.
+     inout: symmetric. Things changing in place: hover, colour, theme.
+     snap:  overshoots slightly past the end and settles. Toggles and
+            anything that should feel physically thrown.
+     Durations stay short; the curve does the work, not the clock. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 340ms;
+
   --bg: #f7f8fa;
   --surface: #ffffff;
   --surface-2: #f1f3f6;
@@ -209,7 +223,8 @@
   padding: 10px 12px;
   font-size: var(--fs-body);
   font-weight: 600;
-  transition: 0.2s ease;
+  transition: color var(--dur-fast) var(--ease-in-out),
+    background var(--dur-fast) var(--ease-in-out);
 }
 .nav-item:hover {
   color: var(--text);
@@ -401,7 +416,8 @@
   padding: 10px 13px;
   font-size: var(--fs-meta);
   font-weight: 700;
-  transition: 0.2s ease;
+  transition: color var(--dur-fast) var(--ease-in-out),
+    background var(--dur-fast) var(--ease-in-out);
 }
 .primary-button {
   color: var(--on-accent);
@@ -432,7 +448,7 @@
   padding: 10px 13px;
   margin: -9px 0 18px;
   font-size: var(--fs-meta);
-  animation: slide-in 0.25s ease both;
+  animation: slide-in var(--dur-slow) var(--ease-out) both;
 }
 .toast svg {
   color: var(--green);
@@ -880,7 +896,7 @@ td:first-child {
     z-index: 20;
     width: 244px;
     transform: translateX(-100%);
-    transition: transform 0.25s ease;
+    transition: transform var(--dur) var(--ease-out);
   }
   .sidebar-open {
     transform: translateX(0);

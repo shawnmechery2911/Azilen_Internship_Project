@@ -144,7 +144,7 @@ export function OverviewScreen({
   if (loading)
     return (
       <div className="page-wrap">
-        <Loading label="Loading pipeline activity..." />
+        <Loading label="Loading pipeline activity..." rows={5} />
       </div>
     );
   if (error)

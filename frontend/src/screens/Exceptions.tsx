@@ -77,7 +77,7 @@ export function ExceptionsScreen({ ats }: { ats?: string | null }) {
   if (loading)
     return (
       <div className="page-wrap">
-        <Loading label="Loading exceptions..." />
+        <Loading label="Loading exceptions..." rows={3} />
       </div>
     );
   if (error && !records.length)

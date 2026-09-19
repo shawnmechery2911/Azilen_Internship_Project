@@ -81,7 +81,7 @@ export function ProcessPanel({
   if (error && !fixtures.length)
     return <ErrorPanel message={error} retry={() => void load()} />;
   if (!fixtures.length)
-    return <Loading label="Loading stored demo payloads..." />;
+    return <Loading label="Loading stored demo payloads..." rows={2} />;
   return (
     <section className="panel process-panel">
       <div className="panel-heading">

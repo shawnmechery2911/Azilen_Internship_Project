@@ -67,7 +67,7 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
   if (loading)
     return (
       <div className="page-wrap">
-        <Loading label="Loading validation rules..." />
+        <Loading label="Loading validation rules..." rows={6} />
       </div>
     );
   if (error && !rules.length)
