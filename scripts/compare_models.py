@@ -38,7 +38,8 @@ from bedrock_proposer import BedrockProposer, describe_paths  # noqa: E402
 DEFAULT_MODELS = ["us.anthropic.claude-sonnet-5", "qwen.qwen3-32b-v1:0"]
 
 # A partner nobody has seen before, deliberately not one of the fixtures: it
-# holds eight fields that map cleanly and, importantly, no phone number.
+# holds ten fields that map cleanly and, importantly, no phone number, no
+# street line and no country.
 PAYLOAD = """<Order>
   <Account>ACME-77</Account>
   <Candidate>
@@ -58,8 +59,10 @@ EXPECTED = {
     "Applicant.Email": "Candidate.Mail",
     "Applicant.SSN": "Candidate.Ssn",
     "Applicant.DateOfBirth": "Candidate.Born",
+    "Applicant.CurrentAddress.Region": "Candidate.Home.Region",
+    "Applicant.CurrentAddress.PostalCode": "Candidate.Home.Post",
     "Request.BackgroundOrder.BackgroundPackageName": "Package",
-    "Applicant.Addresses.City": "Candidate.Home.Town",
+    "Applicant.CurrentAddress.City": "Candidate.Home.Town",
 }
 
 # Destinations this payload has no source for. Mapping any of these is the
@@ -69,6 +72,10 @@ SHOULD_ABSTAIN = {
     "Applicant.Names[0].MiddleName",
     "Applicant.Names[0].Suffix",
     "TransactInfo.TransactId",
+    # The address is a town, a region and a postcode. A model that fills in a
+    # street line or a country from those has guessed at a person's address.
+    "Applicant.CurrentAddress.Address1",
+    "Applicant.CurrentAddress.CountryCode",
 }
 
 
@@ -77,9 +84,25 @@ def destinations() -> list[str]:
     return raw if isinstance(raw, list) else list(raw.values())[0]
 
 
-def run(model: str, trials: int) -> None:
-    payload = pipeline.parse_input(PAYLOAD)
+def check_targets() -> list[str]:
+    """Score only against destinations the models are actually offered.
+
+    Both EXPECTED and SHOULD_ABSTAIN used to name paths that were not in the
+    fixture, so no model could ever have hit them and the denominator was two
+    too large - a model scoring everything it was asked for still read as 6/8.
+    """
     targets = destinations()
+    stray = (set(EXPECTED) | SHOULD_ABSTAIN) - set(targets)
+    if stray:
+        raise SystemExit(
+            "These are scored but never offered to the model, so the result "
+            "would be wrong: " + ", ".join(sorted(stray))
+        )
+    return targets
+
+
+def run(model: str, trials: int, targets: list[str]) -> None:
+    payload = pipeline.parse_input(PAYLOAD)
     real_paths = set(describe_paths(payload))
 
     shapes: list[frozenset[tuple[str, str]]] = []
@@ -129,11 +152,12 @@ def main() -> None:
     parser.add_argument("--models", nargs="+", default=DEFAULT_MODELS)
     parser.add_argument("--trials", type=int, default=3)
     args = parser.parse_args()
+    targets = check_targets()
 
     for model in args.models:
         print("=" * 66)
         print(model)
-        run(model, args.trials)
+        run(model, args.trials, targets)
 
 
 if __name__ == "__main__":

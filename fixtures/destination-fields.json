@@ -16,5 +16,11 @@
   "Applicant.Names[0].Suffix",
   "Applicant.Email",
   "Applicant.PhoneNumber",
-  "Applicant.SSN"
+  "Applicant.SSN",
+  "Applicant.DateOfBirth",
+  "Applicant.CurrentAddress.Address1",
+  "Applicant.CurrentAddress.City",
+  "Applicant.CurrentAddress.Region",
+  "Applicant.CurrentAddress.PostalCode",
+  "Applicant.CurrentAddress.CountryCode"
 ]

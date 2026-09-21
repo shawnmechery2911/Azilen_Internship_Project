@@ -34,8 +34,8 @@ DEFAULT_RULES = [
     ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "a social security number", required=True),
     ValidationRule("dob_present", "Applicant.DateOfBirth", "Completeness", "a date of birth", required=True),
     ValidationRule("phone_present", "Applicant.PhoneNumber", "Completeness", "a phone number", required=True),
-    ValidationRule("city_present", "Applicant.Addresses.City", "Completeness", "an address history", required=True),
-    # Every remaining destination field, so all 18 appear on the Validation
+    ValidationRule("city_present", "Applicant.CurrentAddress.City", "Completeness", "the applicant's current city", required=True),
+    # Every remaining destination field, so all 24 appear on the Validation
     # screen and presence can be demanded per partner with a toggle. They ship
     # not-required because no current partner sends them - switching one on
     # without the partner sending it would fail every order for that partner.
@@ -44,6 +44,10 @@ DEFAULT_RULES = [
     ValidationRule("partner_ref_present", "Applicant.PartnerReference1", "Completeness", "the partner's own reference"),
     ValidationRule("middle_name_present", "Applicant.Names[0].MiddleName", "Completeness", "the applicant's middle name"),
     ValidationRule("suffix_present", "Applicant.Names[0].Suffix", "Completeness", "the applicant's name suffix"),
+    ValidationRule("address_line_present", "Applicant.CurrentAddress.Address1", "Completeness", "the applicant's street address"),
+    ValidationRule("region_present", "Applicant.CurrentAddress.Region", "Completeness", "the applicant's state or region"),
+    ValidationRule("postal_code_present", "Applicant.CurrentAddress.PostalCode", "Completeness", "the applicant's postal code"),
+    ValidationRule("country_code_present", "Applicant.CurrentAddress.CountryCode", "Completeness", "the applicant's country"),
 ]
 
 
@@ -95,7 +99,11 @@ def seed() -> None:
         FieldMapping("Person.SSN", "Applicant.SSN", required=True, transform="digits_only"),
         FieldMapping("Person.DOB", "Applicant.DateOfBirth", required=True, transform="date"),
         FieldMapping("Person.Phone", "Applicant.PhoneNumber", transform="phone"),
-        FieldMapping("Person.AddressHistory.Address.City", "Applicant.Addresses.City", source_is_list=True),
+        # vsys sends AddressHistory, which is a list. The destination model has
+        # CurrentAddress (one object) and PreviousAddresses (a list), and a path
+        # cannot yet say "the entry where Current is Y" or write a whole list of
+        # objects - so there is no honest destination for this row today. It used
+        # to point at Applicant.Addresses.City, which is not on the model at all.
     ]
     vsys_payloads = [read_xml("vsys-order.xml"), read_xml("vsys-order-2addresses.xml")]
     store.add_draft("vsys", "background", vsys_rows, proposed_by="seed")
