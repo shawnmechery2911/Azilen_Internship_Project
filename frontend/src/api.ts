@@ -227,7 +227,7 @@ export function editDraftMapping(
 export function bindValidationRule(
   ats: string,
   ruleId: string,
-  changes: { enabled?: boolean; required?: boolean },
+  changes: { enabled?: boolean; required?: boolean; allowed_values?: string[] },
 ): Promise<ValidationRule> {
   return request(`/partners/${ats}/validation-rules/${ruleId}`, {
     method: "PATCH",

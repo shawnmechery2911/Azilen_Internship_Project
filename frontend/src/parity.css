@@ -1410,7 +1410,42 @@ button.row:hover .row-action {
   font: var(--fs-label) var(--mono);
   white-space: nowrap;
 }
-.rule-unsent {
+.rules-row small.rule-unsent {
+  color: var(--amber);
+  font-family: var(--sans);
+}
+.value-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+.chip {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  text-decoration: line-through;
+}
+.chip:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+.chip-on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.chip:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.rules-row small.chip-note {
   color: var(--amber);
   font-family: var(--sans);
 }

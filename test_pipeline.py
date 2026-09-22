@@ -631,6 +631,43 @@ class PipelineTests(unittest.TestCase):
             applied = {r.id: r for r in binds.rules_for("ats", rules.all())}
             self.assertFalse(applied["given"].required)
 
+    def test_the_api_refuses_to_widen_a_rule(self):
+        """Silently dropping a stray value would leave someone believing the
+        partner accepts it, so the request fails and says why."""
+        import api
+
+        with TemporaryDirectory() as folder:
+            rules = ValidationRuleStore(Path(folder) / "rules.json")
+            rules.replace_all([
+                ValidationRule("fcra", "FCRAPermissibleType", "Format", "a purpose",
+                               allowed_values=("Volunteer", "Tenant Screening")),
+                ValidationRule("ssn", "Applicant.SSN", "Completeness", "an SSN"),
+            ])
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            with patch.object(api, "rules_store", rules), patch.object(api, "bindings", binds):
+                client = TestClient(api.app)
+                path = "/api/partners/vsys/validation-rules/fcra"
+
+                narrow = client.patch(path, json={"allowed_values": ["Volunteer"]})
+                self.assertEqual(narrow.status_code, 200)
+                self.assertEqual(narrow.json()["allowed_values"], ["Volunteer"])
+
+                widen = client.patch(path, json={"allowed_values": ["Volunteer", "Something Else"]})
+                self.assertEqual(widen.status_code, 400)
+                self.assertIn("never more", widen.json()["detail"])
+
+                empty = client.patch(path, json={"allowed_values": []})
+                self.assertEqual(empty.status_code, 400)
+                self.assertIn("fail every order", empty.json()["detail"])
+
+                # a rule that checks no list has nothing to narrow
+                wrong = client.patch("/api/partners/vsys/validation-rules/ssn",
+                                     json={"allowed_values": ["anything"]})
+                self.assertEqual(wrong.status_code, 400)
+
+                # the narrowing survived every refusal
+                self.assertEqual(binds.for_ats("vsys")["fcra"]["allowed_values"], ["Volunteer"])
+
     def test_unknown_exception_id_returns_404(self):
         from api import app
 
@@ -798,6 +835,77 @@ class PipelineTests(unittest.TestCase):
             self.assertTrue(vsys["ssn_present"].required)
             self.assertTrue(vsys["ssn_present"].bound)
             self.assertFalse(ideal["ssn_present"].required)
+
+    def purposes(self, folder):
+        rules = ValidationRuleStore(Path(folder) / "rules.json")
+        rules.replace_all([
+            ValidationRule("fcra", "FCRAPermissibleType", "Format", "a purpose",
+                           allowed_values=("Volunteer", "Tenant Screening", "Employment Screening")),
+            ValidationRule("ssn_present", "Applicant.SSN", "Completeness", "an SSN", required=True),
+        ])
+        return rules
+
+    def test_a_partner_can_be_held_to_fewer_values(self):
+        """A client who screens volunteers should be held to Volunteer alone,
+        not to every purpose the model accepts."""
+        with TemporaryDirectory() as folder:
+            rules = self.purposes(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("vsys", "fcra", allowed_values=["Volunteer"])
+            vsys = {r.id: r for r in binds.rules_for("vsys", rules.all())}
+            other = {r.id: r for r in binds.rules_for("ideal-ats", rules.all())}
+            self.assertEqual(vsys["fcra"].allowed_values, ("Volunteer",))
+            # every other partner keeps the whole list
+            self.assertEqual(len(other["fcra"].allowed_values), 3)
+            # and the catalogue itself is untouched
+            self.assertEqual(len(next(r for r in rules.all() if r.id == "fcra").allowed_values), 3)
+
+    def test_a_narrowed_rule_rejects_what_it_no_longer_allows(self):
+        with TemporaryDirectory() as folder:
+            rules = self.purposes(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("vsys", "fcra", allowed_values=["Volunteer"])
+            store = MappingStore(Path(folder) / "m.json")
+            store.add_draft("vsys", "background",
+                            [FieldMapping("purpose", "FCRAPermissibleType")], proposed_by="author")
+            store.approve("vsys", "background", 1, "reviewer")
+            pipe = Pipeline(store)
+
+            good = pipe.process("vsys", "background", {"purpose": "Volunteer"},
+                                binds.rules_for("vsys", rules.all()))
+            self.assertEqual(good.status, "processed")
+            # accepted for anyone else, refused for this partner
+            bad = pipe.process("vsys", "background", {"purpose": "Tenant Screening"},
+                               binds.rules_for("vsys", rules.all()))
+            self.assertEqual(bad.status, "exception")
+
+    def test_a_binding_cannot_widen_what_the_model_accepts(self):
+        """Narrowing is a partner's business; widening is the catalogue's. A
+        stored value the catalogue never listed is dropped, not honoured."""
+        with TemporaryDirectory() as folder:
+            rules = self.purposes(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("vsys", "fcra", allowed_values=["Volunteer", "Anything At All"])
+            applied = {r.id: r for r in binds.rules_for("vsys", rules.all())}
+            self.assertEqual(applied["fcra"].allowed_values, ("Volunteer",))
+
+    def test_a_narrowing_that_permits_nothing_is_ignored(self):
+        """A rule allowing no value would fail every order, which is never
+        what someone meant."""
+        with TemporaryDirectory() as folder:
+            rules = self.purposes(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("vsys", "fcra", allowed_values=["Nothing Valid"])
+            applied = {r.id: r for r in binds.rules_for("vsys", rules.all())}
+            self.assertEqual(len(applied["fcra"].allowed_values), 3)
+
+    def test_covering_every_value_lifts_the_narrowing(self):
+        with TemporaryDirectory() as folder:
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("vsys", "fcra", allowed_values=["Volunteer"])
+            self.assertIn("allowed_values", binds.for_ats("vsys")["fcra"])
+            binds.set("vsys", "fcra", allowed_values=[])   # what the API sends back
+            self.assertNotIn("allowed_values", binds.for_ats("vsys")["fcra"])
 
     def test_a_disabled_rule_does_nothing(self):
         rule = ValidationRule("email_format", "Applicant.Email", "Format", "an email", pattern=r"[^@\s]+@[^@\s]+\.[^@\s]+", enabled=False)

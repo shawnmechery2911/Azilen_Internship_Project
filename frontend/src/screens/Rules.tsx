@@ -40,16 +40,25 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
   // partner never sends turns every one of their orders into an exception, so
   // the ones they do send are worth pointing out.
   const [sends, setSends] = useState<Set<string> | null>(null);
+  // The catalogue's own allowed values. A partner's list is the narrowed one,
+  // so offering the choice needs the full list it was narrowed from.
+  const [everyValue, setEveryValue] = useState<Record<string, string[]>>({});
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [nextRules, nextPartners] = await Promise.all([
+      const [nextRules, nextPartners, catalogue] = await Promise.all([
         getValidationRules(scope || undefined),
         getPartners(),
+        scope ? getValidationRules() : Promise.resolve(null),
       ]);
       setRules(nextRules);
       setPartners(nextPartners);
+      setEveryValue(
+        Object.fromEntries(
+          (catalogue ?? []).map((rule) => [rule.id, rule.allowed_values]),
+        ),
+      );
       const partner = nextPartners.find((item) => item.ats === scope);
       if (!partner) {
         setSends(null);
@@ -71,9 +80,28 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
   useEffect(() => {
     void load();
   }, [load]);
+  /** In partner scope a rule carries its narrowed list, so the full set to
+   *  choose from has to come from the catalogue. */
+  const choicesFor = (rule: ValidationRule) =>
+    scope ? everyValue[rule.id] ?? [] : rule.allowed_values;
+  /** Include or drop one value for this partner. Narrowing only - the server
+   *  refuses a value the catalogue does not list, and covering the whole list
+   *  lifts the narrowing rather than storing a copy of it. */
+  async function narrow(rule: ValidationRule, value: string) {
+    const all = everyValue[rule.id] ?? [];
+    const held = new Set(rule.allowed_values);
+    if (held.has(value)) held.delete(value);
+    else held.add(value);
+    const next = all.filter((item) => held.has(item));
+    if (!next.length) {
+      setError("A rule that allows no value would fail every order.");
+      return;
+    }
+    await toggle(rule, { allowed_values: next });
+  }
   async function toggle(
     rule: ValidationRule,
-    changes: { enabled?: boolean; required?: boolean },
+    changes: { enabled?: boolean; required?: boolean; allowed_values?: string[] },
   ) {
     setBusy(rule.id);
     setError("");
@@ -229,9 +257,35 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
                       <small className="rule-unsent">{scope} does not send this</small>
                     )}
                     {rule.pattern && <small>{rule.pattern}</small>}
-                    {rule.allowed_values.length > 0 && (
-                      <small>one of: {rule.allowed_values.join(", ")}</small>
-                    )}
+                    {choicesFor(rule).length > 0 &&
+                      (scope ? (
+                        /* Narrowing is the one thing a partner may change about
+                           a rule, so it is edited where the rule is read. */
+                        <span className="value-chips">
+                          {choicesFor(rule).map((value) => {
+                            const held = rule.allowed_values.includes(value);
+                            return (
+                              <button
+                                key={value}
+                                className={held ? "chip chip-on" : "chip"}
+                                aria-pressed={held}
+                                disabled={busy === rule.id || busy === group}
+                                onClick={() => void narrow(rule, value)}
+                              >
+                                {value}
+                              </button>
+                            );
+                          })}
+                          {rule.allowed_values.length <
+                            choicesFor(rule).length && (
+                            <small className="chip-note">
+                              narrowed for {scope}
+                            </small>
+                          )}
+                        </span>
+                      ) : (
+                        <small>one of: {rule.allowed_values.join(", ")}</small>
+                      ))}
                   </span>
                   <div className="rules-cell">
                     {/* Presence is the whole of a Completeness rule, so one

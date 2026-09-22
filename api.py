@@ -406,6 +406,35 @@ class RuleGroupUpdate(RuleUpdate):
     group: str
 
 
+class RuleBindingUpdate(RuleUpdate):
+    """What one partner may change about one rule.
+
+    allowed_values narrows, and only narrows. pattern and check stay in the
+    catalogue: a partner sending a different date format is a transform on the
+    mapping row, not a looser rule, and per-partner shapes would put several
+    shapes into a model whose whole job is to have one.
+    """
+
+    allowed_values: list[str] | None = None
+
+
+def narrowing(rule, chosen: list[str]) -> list[str]:
+    """Check a proposed narrowing, and refuse anything that is not one."""
+    if not rule.allowed_values:
+        raise HTTPException(400, f"{rule.id} does not check a value against a list")
+    if not chosen:
+        raise HTTPException(400, "A rule that allows no value would fail every order")
+    stray = [value for value in chosen if value not in rule.allowed_values]
+    if stray:
+        raise HTTPException(
+            400,
+            f"{rule.id} does not allow " + ", ".join(stray)
+            + ". A partner can be held to fewer values than the model accepts, never more.",
+        )
+    # covering the whole catalogue list is the same as having no opinion
+    return [] if set(chosen) >= set(rule.allowed_values) else chosen
+
+
 @app.patch("/api/validation-rules")
 def update_validation_rule_group(body: RuleGroupUpdate):
     """Set one flag across a whole group of catalogue rules."""
@@ -452,8 +481,8 @@ def update_validation_rule(rule_id: str, body: RuleUpdate):
 
 
 @app.patch("/api/partners/{ats}/validation-rules/{rule_id}")
-def bind_validation_rule(ats: str, rule_id: str, body: RuleUpdate):
-    """Decide whether one partner is held to one catalogue rule.
+def bind_validation_rule(ats: str, rule_id: str, body: RuleBindingUpdate):
+    """Decide how one partner is held to one catalogue rule.
 
     This is the per-onboarding choice, and it touches nothing else: the same
     rule stays exactly as it was for every other partner.
@@ -461,8 +490,11 @@ def bind_validation_rule(ats: str, rule_id: str, body: RuleUpdate):
     changes = {key: value for key, value in body.model_dump().items() if value is not None}
     if not changes:
         raise HTTPException(400, "Nothing to change")
-    if not any(rule.id == rule_id for rule in rules_store.all()):
+    rule = next((item for item in rules_store.all() if item.id == rule_id), None)
+    if rule is None:
         raise HTTPException(404, f"Unknown rule: {rule_id}")
+    if "allowed_values" in changes:
+        changes["allowed_values"] = narrowing(rule, changes["allowed_values"])
     bindings.set(ats, rule_id, **changes)
     return next(
         asdict(rule) for rule in rules_for(ats) if rule.id == rule_id

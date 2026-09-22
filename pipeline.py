@@ -580,9 +580,30 @@ class RuleBindingStore(JsonBacked):
             return
         self.bindings = json.loads(self.path.read_text(encoding="utf-8"))
 
-    def for_ats(self, ats: str) -> dict[str, dict[str, bool]]:
+    def for_ats(self, ats: str) -> dict[str, dict[str, Any]]:
         self._reload_if_changed()
         return dict(self.bindings.get(ats, {}))
+
+    @staticmethod
+    def narrowed(rule: ValidationRule, chosen: Iterable[str] | None) -> tuple[str, ...]:
+        """A partner's allowed values, which may only be fewer than the rule's.
+
+        Narrowing per partner is the point: a client who screens volunteers
+        should be held to Volunteer alone rather than to every permissible
+        purpose. Widening is not, and is dropped rather than honoured - a
+        value the canonical model rejects does not become acceptable because
+        one partner sends it.
+
+        An empty or absent choice means no opinion, so the catalogue's own
+        list stands. It cannot mean "permit nothing": a rule that allows no
+        value at all would fail every order, which is never a configuration
+        anybody wants and is far more likely to be a mistake.
+        """
+        if not chosen:
+            return rule.allowed_values
+        wanted = set(chosen)
+        kept = tuple(value for value in rule.allowed_values if value in wanted)
+        return kept or rule.allowed_values
 
     def rules_for(self, ats: str, catalogue: list[ValidationRule]) -> list[ValidationRule]:
         """The catalogue as this partner is held to it.
@@ -605,15 +626,24 @@ class RuleBindingStore(JsonBacked):
                         enabled=binding.get("enabled", rule.enabled),
                         required=binding.get("required", False),
                         bound=True,
+                        allowed_values=self.narrowed(rule, binding.get("allowed_values")),
                     )
                 )
         return applied
 
-    def set(self, ats: str, rule_id: str, **changes: bool) -> dict[str, bool]:
+    def set(self, ats: str, rule_id: str, **changes: Any) -> dict[str, Any]:
         self._reload_if_changed()
         partner = self.bindings.setdefault(ats, {})
         current = partner.setdefault(rule_id, {"enabled": True, "required": False})
-        current.update({k: v for k, v in changes.items() if v is not None})
+        for key, value in changes.items():
+            if value is None:
+                continue
+            # Only allowed_values arrives as a list, and an empty one is how a
+            # narrowing is lifted - stored, it would read as "permit nothing".
+            if value == []:
+                current.pop(key, None)
+            else:
+                current[key] = value
         self._save()
         return current
 
