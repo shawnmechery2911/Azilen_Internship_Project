@@ -84,6 +84,18 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(payload["Person"]["Name"], "Ada")
         self.assertEqual(payload["Tag"], ["x", "y"])
 
+    def test_broken_json_is_reported_as_json_not_xml(self):
+        """XML is the fallback, so its error used to be the one that surfaced:
+        a JSON file came back "not well-formed: line 1, column 0", which names
+        the wrong format and sends you to the wrong line."""
+        # a single quote escaped the way a shell escapes it, not the way JSON does
+        with self.assertRaises(ValueError) as caught:
+            parse_input('{"degree": "Bachelor\'\\\'\'s"}')
+        message = str(caught.exception)
+        self.assertIn("Invalid JSON", message)
+        self.assertIn("line 1", message)
+        self.assertNotIn("well-formed", message)
+
     def test_repeated_list_paths_are_read(self):
         payload = {"Person": {"AddressHistory": {"Address": [{"City": "London"}, {"City": "Paris"}]}}}
         self.assertEqual(parse_input(json.dumps(payload))["Person"]["AddressHistory"]["Address"][1]["City"], "Paris")

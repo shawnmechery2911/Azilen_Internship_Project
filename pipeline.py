@@ -119,7 +119,13 @@ def parse_input(payload: str | bytes | dict[str, Any]) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValueError("JSON payload must be an object")
         return value
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as json_error:
+        # XML is the fallback, so its complaint is what used to reach the user:
+        # a plainly-JSON file came back "not well-formed (invalid token): line
+        # 1, column 0", naming the wrong format and the wrong place. Report the
+        # error for the format the file is actually written in.
+        if text.lstrip("﻿ \t\r\n").startswith(("{", "[")):
+            raise ValueError(f"Invalid JSON - {json_error}") from json_error
         return xml_to_dict(text)
 
 
