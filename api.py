@@ -144,6 +144,38 @@ def partner_samples(ats: str):
     ]
 
 
+class StoredOrder(BaseModel):
+    payload: dict | str
+
+
+@app.post("/api/partners/{ats}/samples")
+def add_partner_sample(ats: str, body: StoredOrder):
+    """Keep an order for this partner without sending it through.
+
+    Onboarding leaves one sample and clean orders add themselves, which is
+    enough to run the pipeline but not enough to exercise it: showing what
+    happens when a partner renames a field needs a payload in the new shape,
+    and waiting for them to send one is not an option.
+
+    These are the same stored orders as any other, replay corpus included.
+    That is deliberate - a payload worth testing against is a payload a new
+    mapping should still handle - but it does mean adding one that this
+    partner would never really send holds every later approval to it.
+    """
+    if not any(partner["ats"] == ats for partner in store.list_partners()):
+        raise HTTPException(404, f"No partner called {ats}")
+    try:
+        parsed = parse_input(body.payload)
+    except Exception as error:
+        raise HTTPException(400, f"Could not parse this payload: {error}") from error
+    before = len(samples.for_ats(ats))
+    samples.remember(ats, parsed)
+    return {
+        "stored": len(samples.for_ats(ats)),
+        "added": len(samples.for_ats(ats)) > before,
+    }
+
+
 @app.get("/api/partners/{ats}/source-fields")
 def partner_source_fields(ats: str):
     """The paths this partner's own payloads actually contain.

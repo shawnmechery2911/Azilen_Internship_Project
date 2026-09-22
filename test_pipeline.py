@@ -271,6 +271,22 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(rename["field"], "Person.ApplicantID")
             self.assertEqual(rename["became"], "Person.CandidateID")
 
+    def test_a_renamed_top_level_field_is_reported_as_a_rename(self):
+        """The same rename one level up. rsplit on a path with no dot returns
+        the path itself, so two top-level fields read as living in different
+        objects and this came back as an unrelated removal plus an addition -
+        no rename, and so no one-click remap, for the commonest case there is."""
+        with TemporaryDirectory() as folder:
+            store = self.approved(folder, [FieldMapping("first_name", "Applicant.Names[0].GivenName", True)])
+            shapes = PayloadShape(Path(folder) / "shapes.json")
+            pipeline = Pipeline(store, shapes=shapes)
+            for _ in range(3):
+                pipeline.process("ats", "candidate", {"first_name": "Katherine"})
+            result = pipeline.process("ats", "candidate", {"given_name": "Katherine"})
+            rename = next(a for a in result.drift_alerts if a["kind"] == "renamed")
+            self.assertEqual(rename["field"], "first_name")
+            self.assertEqual(rename["became"], "given_name")
+
     def test_a_new_field_is_drift_even_when_nothing_fails(self):
         """A partner who starts sending a phone number breaks nothing, and it
         is still the thing you want to know."""

@@ -1213,6 +1213,17 @@ class PayloadShape(JsonBacked):
         self._stamp = file_stamp(self.path)
 
 
+def parent_of(path: str) -> str:
+    """The object a path sits in, with the root spelt "".
+
+    rsplit on a top-level path returns the path itself, so first_name and
+    given_name read as living in different objects and a rename between them
+    could never be inferred - which is most renames, since a partner's own
+    ids and names usually sit at the top of the payload.
+    """
+    return path.rsplit(".", 1)[0] if "." in path else ""
+
+
 def describe_shape_change(
     change: dict[str, list[str]], mapped_sources: set[str]
 ) -> list[dict[str, str]]:
@@ -1232,7 +1243,7 @@ def describe_shape_change(
         likely = [
             candidate
             for candidate in new
-            if candidate.rsplit(".", 1)[0] == path.rsplit(".", 1)[0]
+            if parent_of(candidate) == parent_of(path)
             or tail[:4] in candidate.rsplit(".", 1)[-1].lower()
         ]
         if len(likely) == 1:

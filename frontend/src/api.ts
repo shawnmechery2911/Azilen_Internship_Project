@@ -196,6 +196,16 @@ export function remapSource(
     body: JSON.stringify({ from_source: fromSource, to_source: toSource }),
   });
 }
+/** Keep an order for a partner without sending it through. */
+export function addPartnerSample(
+  ats: string,
+  payload: string,
+): Promise<{ stored: number; added: boolean }> {
+  return request(`/partners/${encodeURIComponent(ats)}/samples`, {
+    method: "POST",
+    body: JSON.stringify({ payload }),
+  });
+}
 export function getPartnerSamples(ats: string): Promise<PartnerSample[]> {
   return request(`/partners/${ats}/samples`);
 }

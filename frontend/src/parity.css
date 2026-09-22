@@ -579,10 +579,6 @@ button.mapping-list-row:hover {
   font-size: var(--fs-label);
   font-weight: 600;
 }
-.page-wrap-tight {
-  padding-top: 0;
-  margin-top: -18px;
-}
 
 /* --- mapping review ---------------------------------------------------------
    The verdict is the headline: a reviewer's first question is whether this can
@@ -1448,4 +1444,25 @@ button.row:hover .row-action {
 .rules-row small.chip-note {
   color: var(--amber);
   font-family: var(--sans);
+}
+.payload-input {
+  width: 100%;
+  min-height: 130px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  resize: vertical;
+}
+.payload-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.row-static {
+  cursor: default;
 }

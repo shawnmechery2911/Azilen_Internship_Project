@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Building2,
   Code2,
+  FlaskConical,
   Inbox,
   Layers3,
   Menu,
@@ -10,10 +12,16 @@ import {
   Zap,
 } from "lucide-react";
 
+/** Watching, then the partners themselves, then the two things you do to
+ *  them. Validation last because it is the catalogue every partner starts
+ *  from - a partner's own rules live on that partner. */
 const navItems = [
   ["Overview", Layers3],
+  ["Partners", Building2],
   ["Exceptions", Inbox],
   ["Onboard", Code2],
+  ["Test", FlaskConical],
+  ["Validation", Settings2],
 ] as const;
 
 type Theme = "light" | "dark";
@@ -81,13 +89,6 @@ export function Shell({
               )}
             </button>
           ))}
-          <button
-            className={`nav-item ${activeNav === "Validation" ? "nav-active" : ""}`}
-            onClick={() => onNavigate("Validation")}
-          >
-            <Settings2 size={17} />
-            <span>Validation</span>
-          </button>
         </nav>
         <div className="sidebar-footer">
           <div className="health-line">

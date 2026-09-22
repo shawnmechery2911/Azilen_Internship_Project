@@ -7,8 +7,9 @@ import { ExceptionsScreen } from "./screens/Exceptions";
 import { MappingReviewScreen } from "./screens/MappingReview";
 import { OnboardingScreen } from "./screens/Onboarding";
 import { OverviewScreen } from "./screens/Overview";
-import { ProcessPanel } from "./components/ProcessPanel";
+import { PartnersScreen } from "./screens/Partners";
 import { RulesScreen } from "./screens/Rules";
+import { TestOrderScreen } from "./screens/TestOrder";
 
 function App() {
   const [screen, setScreen] = useState("Overview");
@@ -61,6 +62,13 @@ function App() {
       <ExceptionsScreen ats={queueAts} />
     ) : screen === "Onboard" ? (
       <OnboardingScreen onReview={openReview} />
+    ) : screen === "Partners" ? (
+      <PartnersScreen
+        onReview={openReview}
+        onExceptions={(ats) => navigate("Exceptions", ats)}
+      />
+    ) : screen === "Test" ? (
+      <TestOrderScreen onReview={openReview} />
     ) : screen === "Validation" ? (
       <RulesScreen scope={ruleScope} />
     ) : screen === "Review" && review ? (
@@ -71,12 +79,7 @@ function App() {
         retired={retired}
       />
     ) : (
-      <>
-        <OverviewScreen onNavigate={navigate} onReview={openReview} />
-        <div className="page-wrap page-wrap-tight">
-          <ProcessPanel onReview={openReview} />
-        </div>
-      </>
+      <OverviewScreen onNavigate={navigate} onReview={openReview} />
     );
   return (
     <Shell

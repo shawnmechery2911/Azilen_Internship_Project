@@ -23,7 +23,12 @@ function isOn(rule: ValidationRule): boolean {
     : rule.enabled;
 }
 
-export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) {
+/** `embedded` drops the page chrome so a partner's own page can host the real
+ *  editor rather than a second copy of it that drifts from this one. */
+export function RulesScreen({
+  scope: initial,
+  embedded = false,
+}: { scope?: string | null; embedded?: boolean } = {}) {
   const [rules, setRules] = useState<ValidationRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -141,40 +146,43 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
       setBusy(null);
     }
   }
+  const wrap = embedded ? "" : "page-wrap";
   if (loading)
     return (
-      <div className="page-wrap">
+      <div className={wrap}>
         <Loading label="Loading validation rules..." rows={6} />
       </div>
     );
   if (error && !rules.length)
     return (
-      <div className="page-wrap">
+      <div className={wrap}>
         <ErrorPanel message={error} retry={() => void load()} />
       </div>
     );
   if (!rules.length)
     return (
-      <div className="page-wrap">
+      <div className={wrap}>
         <div className="panel">
           <EmptyState label="No validation rules configured." />
         </div>
       </div>
     );
   return (
-    <div className="page-wrap">
-      <section className="page-heading">
-        <div>
-          <div className="eyebrow">Configuration</div>
-          <h1>Validation rules</h1>
-          <p>
-            Completeness rules decide whether a field has to be there. Format
-            and Business rules check a value whenever one is present, so they
-            cost nothing to leave on.
-          </p>
-        </div>
-      </section>
-      {justApproved && (
+    <div className={wrap}>
+      {!embedded && (
+        <section className="page-heading">
+          <div>
+            <div className="eyebrow">Configuration</div>
+            <h1>Validation rules</h1>
+            <p>
+              Completeness rules decide whether a field has to be there. Format
+              and Business rules check a value whenever one is present, so they
+              cost nothing to leave on.
+            </p>
+          </div>
+        </section>
+      )}
+      {justApproved && !embedded && (
         <div className="filter-note">
           <span>
             <strong>{initial}</strong> is approved.{" "}
@@ -192,23 +200,25 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
         </div>
       )}
       {error && <div className="toast">{error}</div>}
-      <div className="filter-group" style={{ marginBottom: 16 }}>
-        <button
-          className={scope === "" ? "filter-active" : ""}
-          onClick={() => setScope("")}
-        >
-          catalogue default
-        </button>
-        {partners.map((partner) => (
+      {!embedded && (
+        <div className="filter-group" style={{ marginBottom: 16 }}>
           <button
-            key={partner.ats}
-            className={scope === partner.ats ? "filter-active" : ""}
-            onClick={() => setScope(partner.ats)}
+            className={scope === "" ? "filter-active" : ""}
+            onClick={() => setScope("")}
           >
-            {partner.ats}
+            catalogue default
           </button>
-        ))}
-      </div>
+          {partners.map((partner) => (
+            <button
+              key={partner.ats}
+              className={scope === partner.ats ? "filter-active" : ""}
+              onClick={() => setScope(partner.ats)}
+            >
+              {partner.ats}
+            </button>
+          ))}
+        </div>
+      )}
       {GROUPS.map((group) => {
         const inGroup = rules.filter((rule) => rule.group === group);
         if (!inGroup.length) return null;
