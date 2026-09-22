@@ -694,6 +694,35 @@ class PipelineTests(unittest.TestCase):
             # and the catalogue itself is untouched
             self.assertTrue(next(r for r in rules.all() if r.id == "email_format").enabled)
 
+    def test_a_group_moves_together_and_leaves_other_groups_alone(self):
+        """Select-all is one write. Twenty separate ones could half-finish and
+        leave a group in a state nobody chose."""
+        with TemporaryDirectory() as folder:
+            rules = self.catalogue(folder)
+            touched = rules.update_group("Completeness", required=False)
+            self.assertEqual([rule.id for rule in touched], ["ssn_present"])
+            after = {rule.id: rule for rule in rules.all()}
+            self.assertFalse(after["ssn_present"].required)
+            self.assertTrue(after["email_format"].enabled)
+
+            # and it survives a reload, so the single write really happened
+            self.assertFalse(
+                next(r for r in ValidationRuleStore(Path(folder) / "rules.json").all()
+                     if r.id == "ssn_present").required
+            )
+
+    def test_binding_a_group_binds_only_that_partner(self):
+        with TemporaryDirectory() as folder:
+            rules = self.catalogue(folder)
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            ids = [rule.id for rule in rules.all() if rule.group == "Completeness"]
+            binds.set_group("vsys", ids, required=True, enabled=True)
+            vsys = {rule.id: rule for rule in binds.rules_for("vsys", rules.all())}
+            ideal = {rule.id: rule for rule in binds.rules_for("ideal-ats", rules.all())}
+            self.assertTrue(vsys["ssn_present"].required)
+            self.assertTrue(vsys["ssn_present"].bound)
+            self.assertFalse(ideal["ssn_present"].required)
+
     def test_a_disabled_rule_does_nothing(self):
         rule = ValidationRule("email_format", "Applicant.Email", "Format", "an email", pattern=r"[^@\s]+@[^@\s]+\.[^@\s]+", enabled=False)
         with TemporaryDirectory() as folder:

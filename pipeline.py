@@ -442,6 +442,22 @@ class ValidationRuleStore(JsonBacked):
                 return updated
         raise KeyError(f"Unknown rule: {rule_id}")
 
+    def update_group(self, group: str, **changes: Any) -> list[ValidationRule]:
+        """Apply one change to a whole group, in a single write.
+
+        Twenty separate calls would rewrite the file twenty times and could
+        half-finish, leaving a group nobody chose.
+        """
+        self._reload_if_changed()
+        touched = []
+        for index, rule in enumerate(self.rules):
+            if rule.group == group:
+                self.rules[index] = replace_fields(rule, **changes)
+                touched.append(self.rules[index])
+        if touched:
+            self._save()
+        return touched
+
     def replace_all(self, rules: list[ValidationRule]) -> None:
         self.rules = rules
         self._save()
@@ -594,6 +610,15 @@ class RuleBindingStore(JsonBacked):
         current.update({k: v for k, v in changes.items() if v is not None})
         self._save()
         return current
+
+    def set_group(self, ats: str, rule_ids: Iterable[str], **changes: bool) -> None:
+        """Bind a partner to many rules at once, in a single write."""
+        self._reload_if_changed()
+        partner = self.bindings.setdefault(ats, {})
+        wanted = {k: v for k, v in changes.items() if v is not None}
+        for rule_id in rule_ids:
+            partner.setdefault(rule_id, {"enabled": True, "required": False}).update(wanted)
+        self._save()
 
     def forget(self, ats: str) -> None:
         self._reload_if_changed()

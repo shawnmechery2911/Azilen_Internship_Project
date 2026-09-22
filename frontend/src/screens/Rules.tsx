@@ -4,12 +4,23 @@ import {
   getPartners,
   getValidationRules,
   updateValidationRule,
+  updateValidationRuleGroup,
   type Partner,
   type ValidationRule,
 } from "../api";
 import { EmptyState, ErrorPanel, Loading } from "../components/ScreenState";
 
 const GROUPS = ["Completeness", "Format", "Business"] as const;
+
+/** Whether a rule is actually doing anything, which is what its switch shows.
+ *  A Completeness rule needs both flags: `enabled` off means the rule has no
+ *  opinion and the mapping's own required flag decides, so showing it as on
+ *  because `required` is set would promise a check that never runs. */
+function isOn(rule: ValidationRule): boolean {
+  return rule.group === "Completeness"
+    ? rule.required && rule.enabled
+    : rule.enabled;
+}
 
 export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) {
   const [rules, setRules] = useState<ValidationRule[]>([]);
@@ -60,6 +71,24 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
       setError(
         err instanceof Error ? err.message : "Could not update the rule",
       );
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function toggleGroup(group: string, on: boolean) {
+    setBusy(group);
+    setError("");
+    try {
+      await updateValidationRuleGroup(
+        group,
+        // Completeness sets both: `required` is the choice, and `enabled` has
+        // to be on for that choice to be read at all.
+        group === "Completeness" ? { required: on, enabled: true } : { enabled: on },
+        scope || undefined,
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update the group");
     } finally {
       setBusy(null);
     }
@@ -126,12 +155,26 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
       {GROUPS.map((group) => {
         const inGroup = rules.filter((rule) => rule.group === group);
         if (!inGroup.length) return null;
+        const on = inGroup.filter(isOn).length;
+        const allOn = on === inGroup.length;
         return (
           <section className="panel rules-section" key={group}>
             <div className="panel-heading">
               <div>
                 <span className="section-kicker">{inGroup.length} rules</span>
                 <h2>{group}</h2>
+              </div>
+              <div className="rules-bulk">
+                <span className="rules-count">
+                  {on} of {inGroup.length} on
+                </span>
+                <button
+                  className="secondary-button"
+                  disabled={busy === group}
+                  onClick={() => void toggleGroup(group, !allOn)}
+                >
+                  {allOn ? "Clear all" : "Select all"}
+                </button>
               </div>
             </div>
             <div className="rules-table">
@@ -144,7 +187,7 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
               </div>
               {inGroup.map((rule) => (
                 <div
-                  className={`rules-row ${rule.enabled ? "" : "rule-off"}`}
+                  className={`rules-row ${isOn(rule) ? "" : "rule-off"}`}
                   key={rule.id}
                 >
                   <code>{rule.field}</code>
@@ -169,15 +212,13 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
                             ? `${rule.field} must be present`
                             : `${rule.field} rule active`
                         }
-                        checked={
-                          group === "Completeness" ? rule.required : rule.enabled
-                        }
-                        disabled={busy === rule.id}
+                        checked={isOn(rule)}
+                        disabled={busy === rule.id || busy === group}
                         onChange={(event) =>
                           void toggle(
                             rule,
                             group === "Completeness"
-                              ? { required: event.target.checked }
+                              ? { required: event.target.checked, enabled: true }
                               : { enabled: event.target.checked },
                           )
                         }

@@ -243,6 +243,17 @@ export function updateValidationRule(
     { method: "PATCH", body: JSON.stringify(changes) },
   );
 }
+/** One call rather than one per rule: the whole group moves or none of it does. */
+export function updateValidationRuleGroup(
+  group: string,
+  changes: { enabled?: boolean; required?: boolean },
+  ats?: string,
+): Promise<ValidationRule[]> {
+  return request<ValidationRule[]>(
+    ats ? `/partners/${encodeURIComponent(ats)}/validation-rules` : "/validation-rules",
+    { method: "PATCH", body: JSON.stringify({ group, ...changes }) },
+  );
+}
 export function getMapping(
   ats: string,
   payloadType: string,

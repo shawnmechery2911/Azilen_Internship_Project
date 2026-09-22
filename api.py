@@ -371,6 +371,43 @@ def get_validation_rules(ats: str | None = None):
     return [asdict(rule) for rule in rules]
 
 
+class RuleGroupUpdate(RuleUpdate):
+    group: str
+
+
+@app.patch("/api/validation-rules")
+def update_validation_rule_group(body: RuleGroupUpdate):
+    """Set one flag across a whole group of catalogue rules."""
+    changes = {
+        key: value
+        for key, value in body.model_dump().items()
+        if value is not None and key != "group"
+    }
+    if not changes:
+        raise HTTPException(400, "Nothing to change")
+    touched = rules_store.update_group(body.group, **changes)
+    if not touched:
+        raise HTTPException(404, f"No rules in group: {body.group}")
+    return [asdict(rule) for rule in touched]
+
+
+@app.patch("/api/partners/{ats}/validation-rules")
+def bind_validation_rule_group(ats: str, body: RuleGroupUpdate):
+    """Hold one partner to a whole group of rules, or to none of them."""
+    changes = {
+        key: value
+        for key, value in body.model_dump().items()
+        if value is not None and key != "group"
+    }
+    if not changes:
+        raise HTTPException(400, "Nothing to change")
+    ids = [rule.id for rule in rules_store.all() if rule.group == body.group]
+    if not ids:
+        raise HTTPException(404, f"No rules in group: {body.group}")
+    bindings.set_group(ats, ids, **changes)
+    return [asdict(rule) for rule in rules_for(ats) if rule.group == body.group]
+
+
 @app.patch("/api/validation-rules/{rule_id}")
 def update_validation_rule(rule_id: str, body: RuleUpdate):
     """Edit the catalogue rule itself - this is every partner's default."""

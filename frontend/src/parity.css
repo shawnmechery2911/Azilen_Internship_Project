@@ -1399,3 +1399,14 @@ button.row:hover .row-action {
   background: var(--accent);
   color: var(--on-accent);
 }
+.rules-bulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.rules-count {
+  color: var(--muted-2);
+  font: var(--fs-label) var(--mono);
+  white-space: nowrap;
+}
