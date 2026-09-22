@@ -567,6 +567,70 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["abstentions"][0]["destination"], "ssn")
 
+    def test_approval_answers_presence_from_the_mapping(self):
+        """The mapping already says which fields the partner sends and which
+        are always there. Asking the same question again as twenty switches is
+        how a partner ends up demanding nothing."""
+        import api
+
+        with TemporaryDirectory() as folder:
+            rules = ValidationRuleStore(Path(folder) / "rules.json")
+            rules.replace_all([
+                ValidationRule("given", "given", "Completeness", "a first name"),
+                ValidationRule("middle", "middle", "Completeness", "a middle name"),
+                ValidationRule("ssn", "ssn", "Completeness", "an SSN"),
+                ValidationRule("given_shape", "given", "Format", "letters", pattern=r"\w+"),
+            ])
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate", [
+                FieldMapping("person.first", "given", required=True),
+                FieldMapping("person.middle", "middle"),   # sent, but often empty
+            ], proposed_by="author")
+            with patch.object(api, "store", store), \
+                 patch.object(api, "rules_store", rules), \
+                 patch.object(api, "bindings", binds), \
+                 patch.object(api, "samples", SamplePayloadStore(Path(folder) / "samples.json")):
+                client = TestClient(api.app)
+                response = client.post(
+                    "/api/mappings/ats/candidate/1/approve", json={"reviewer": "someone-else"}
+                )
+                self.assertEqual(response.status_code, 200)
+                applied = {r.id: r for r in binds.rules_for("ats", rules.all())}
+
+            # mapped and always there -> demanded
+            self.assertTrue(applied["given"].required)
+            # mapped but optional -> bound, and explicitly not demanded, because
+            # a missing middle name must not turn an ordinary order into an
+            # exception
+            self.assertTrue(applied["middle"].bound)
+            self.assertFalse(applied["middle"].required)
+            # never mapped -> left alone entirely
+            self.assertFalse(applied["ssn"].bound)
+            # and a Format rule is none of this rule's business
+            self.assertFalse(applied["given_shape"].bound)
+
+    def test_approving_again_keeps_choices_made_by_hand(self):
+        import api
+
+        with TemporaryDirectory() as folder:
+            rules = ValidationRuleStore(Path(folder) / "rules.json")
+            rules.replace_all([ValidationRule("given", "given", "Completeness", "a first name")])
+            binds = RuleBindingStore(Path(folder) / "bindings.json")
+            binds.set("ats", "given", enabled=True, required=False)  # switched off on purpose
+            store = MappingStore(Path(folder) / "mappings.json")
+            store.add_draft("ats", "candidate",
+                            [FieldMapping("person.first", "given", required=True)], proposed_by="author")
+            with patch.object(api, "store", store), \
+                 patch.object(api, "rules_store", rules), \
+                 patch.object(api, "bindings", binds), \
+                 patch.object(api, "samples", SamplePayloadStore(Path(folder) / "samples.json")):
+                TestClient(api.app).post(
+                    "/api/mappings/ats/candidate/1/approve", json={"reviewer": "someone-else"}
+                )
+            applied = {r.id: r for r in binds.rules_for("ats", rules.all())}
+            self.assertFalse(applied["given"].required)
+
     def test_unknown_exception_id_returns_404(self):
         from api import app
 

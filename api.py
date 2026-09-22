@@ -255,7 +255,7 @@ def get_versions(ats: str, payload_type: str):
 @app.post("/api/mappings/{ats}/{payload_type}/{version}/approve")
 def approve_mapping(ats: str, payload_type: str, version: int, body: ApproveRequest):
     try:
-        return store.approve(
+        approved = store.approve(
             ats,
             payload_type,
             version,
@@ -265,6 +265,37 @@ def approve_mapping(ats: str, payload_type: str, version: int, body: ApproveRequ
         )
     except ValueError as error:
         raise HTTPException(400, str(error))
+    answer_presence_from(ats, approved)
+    return approved
+
+
+def answer_presence_from(ats: str, mapping) -> None:
+    """Switch on the presence rules the approved mapping has already answered.
+
+    The mapping says which fields this partner sends, and which of those are
+    always there rather than sometimes. That is the same question the
+    validation screen asks, so asking it twice means someone either retypes
+    the mapping as switches or skips the step and demands nothing.
+
+    A row's own required flag decides, not the mere fact that it is mapped: a
+    partner can send a field that is often empty - a middle name, a date of
+    birth nobody filled in - and demanding those would turn ordinary orders
+    into exceptions.
+
+    Only rules nobody has configured are touched, so approving a second
+    version never overwrites a choice someone made by hand.
+    """
+    already = bindings.for_ats(ats)
+    mapped = {row.destination: row.required for row in mapping.mappings}
+    by_required: dict[bool, list[str]] = {True: [], False: []}
+    for rule in rules_store.all():
+        if rule.group != "Completeness" or rule.id in already:
+            continue
+        if rule.field in mapped:
+            by_required[mapped[rule.field]].append(rule.id)
+    for required, ids in by_required.items():
+        if ids:
+            bindings.set_group(ats, ids, enabled=True, required=required)
 
 
 @app.get("/api/mappings/{ats}/{payload_type}/{version}/replay")

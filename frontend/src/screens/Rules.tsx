@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   bindValidationRule,
+  getMapping,
   getPartners,
   getValidationRules,
   updateValidationRule,
@@ -31,7 +32,14 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
   // "" means the catalogue itself - the default every partner starts from
   const [scope, setScope] = useState<string>(initial ?? "");
   const justApproved = Boolean(initial) && scope === initial;
+  const onFromMapping = rules.filter(
+    (rule) => rule.group === "Completeness" && isOn(rule),
+  ).length;
   const [savedRule, setSavedRule] = useState<string | null>(null);
+  // Destinations this partner's approved mapping fills. Demanding a field the
+  // partner never sends turns every one of their orders into an exception, so
+  // the ones they do send are worth pointing out.
+  const [sends, setSends] = useState<Set<string> | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -42,6 +50,18 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
       ]);
       setRules(nextRules);
       setPartners(nextPartners);
+      const partner = nextPartners.find((item) => item.ats === scope);
+      if (!partner) {
+        setSends(null);
+      } else {
+        // a partner with no approved mapping yet simply has nothing to say here
+        const mapping = await getMapping(partner.ats, partner.payload_type).catch(
+          () => null,
+        );
+        setSends(
+          mapping ? new Set(mapping.mappings.map((row) => row.destination)) : null,
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load rules");
     } finally {
@@ -129,8 +149,17 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
       {justApproved && (
         <div className="filter-note">
           <span>
-            <strong>{initial}</strong> is approved. Choose what it must send -
-            shape checks already apply.
+            <strong>{initial}</strong> is approved.{" "}
+            {onFromMapping > 0 ? (
+              <>
+                The {onFromMapping} field
+                {onFromMapping === 1 ? "" : "s"} its mapping always fills{" "}
+                {onFromMapping === 1 ? "is" : "are"} already switched on. Change
+                anything that looks wrong.
+              </>
+            ) : (
+              <>Choose what it must send - shape checks already apply.</>
+            )}
           </span>
         </div>
       )}
@@ -193,6 +222,12 @@ export function RulesScreen({ scope: initial }: { scope?: string | null } = {}) 
                   <code>{rule.field}</code>
                   <span>
                     {rule.description}
+                    {/* Only worth saying for presence: a Format rule on a field
+                        the partner never sends costs nothing, while demanding
+                        that field fails every order they place. */}
+                    {sends && group === "Completeness" && !sends.has(rule.field) && (
+                      <small className="rule-unsent">{scope} does not send this</small>
+                    )}
                     {rule.pattern && <small>{rule.pattern}</small>}
                     {rule.allowed_values.length > 0 && (
                       <small>one of: {rule.allowed_values.join(", ")}</small>

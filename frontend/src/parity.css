@@ -1410,3 +1410,7 @@ button.row:hover .row-action {
   font: var(--fs-label) var(--mono);
   white-space: nowrap;
 }
+.rule-unsent {
+  color: var(--amber);
+  font-family: var(--sans);
+}
