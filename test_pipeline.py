@@ -342,6 +342,46 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(tracker.record("ats", "candidate", issue), [])
             self.assertEqual(len(tracker.record("ats", "candidate", issue)), 1)
 
+    def test_a_field_that_recovers_stops_being_drift(self):
+        """The count only went up, so a field that crossed the threshold once
+        carried a red badge on every later exception for good - including
+        after the mapping that broke it had been fixed."""
+        with TemporaryDirectory() as folder:
+            tracker = DriftTracker(threshold=2, path=Path(folder) / "drift.json")
+            issue = [{"field": "first", "message": "missing"}]
+            tracker.record("ats", "candidate", issue)
+            self.assertEqual(len(tracker.record("ats", "candidate", issue)), 1)
+
+            tracker.record("ats", "candidate", [])       # one clean order
+            self.assertEqual(tracker.failures, {})
+            # and it now has to earn the threshold again
+            self.assertEqual(tracker.record("ats", "candidate", issue), [])
+
+    def test_a_field_still_failing_keeps_its_count(self):
+        """Recovery is per field. One field coming good must not clear the
+        one next to it that is still broken."""
+        with TemporaryDirectory() as folder:
+            tracker = DriftTracker(threshold=2, path=Path(folder) / "drift.json")
+            both = [{"field": "first", "message": "missing"}, {"field": "last", "message": "missing"}]
+            tracker.record("ats", "candidate", both)
+            alerts = tracker.record("ats", "candidate", [{"field": "last", "message": "missing"}])
+            self.assertEqual([a["field"] for a in alerts], ["last"])
+            self.assertNotIn("ats|candidate|first", tracker.failures)
+            # and another partner is never touched by either
+            tracker.record("other", "candidate", both)
+            tracker.record("ats", "candidate", [])
+            self.assertIn("other|candidate|first", tracker.failures)
+
+    def test_a_drift_alert_names_the_field_and_the_count(self):
+        with TemporaryDirectory() as folder:
+            tracker = DriftTracker(threshold=2, path=Path(folder) / "drift.json")
+            issue = [{"field": "Applicant.Email", "message": "missing"}]
+            tracker.record("ats", "candidate", issue)
+            alert = tracker.record("ats", "candidate", issue)[0]
+            self.assertIn("Applicant.Email", alert["message"])
+            self.assertIn("2", alert["message"])
+            self.assertNotIn("threshold", alert["message"])
+
     def test_llm_adapter_can_abstain(self):
         adapter = LLMMappingDraft(lambda payload, fields: [
             {"destination": "given", "source": "first"},

@@ -1294,16 +1294,40 @@ class DriftTracker(JsonBacked):
         self.failures = json.loads(self.path.read_text(encoding="utf-8"))
 
     def record(self, ats: str, payload_type: str, issues: Iterable[dict[str, str]]) -> list[dict[str, str]]:
+        """Count a field's failures, and forget the ones that recover.
+
+        The count only ever went up, and a clean order did not even reach the
+        file, so a field that crossed the threshold once alerted on every later
+        exception for good - including after the mapping that broke it was
+        fixed. A field that comes through a whole order intact is not drifting,
+        whatever it did last week, so its count goes rather than lingering as a
+        red badge on a partner that has recovered.
+        """
         self._reload_if_changed()
+        prefix = f"{ats}|{payload_type}|"
+        failed = {issue["field"] for issue in issues}
         alerts = []
-        had_issues = False
-        for issue in issues:
-            had_issues = True
-            key = f"{ats}|{payload_type}|{issue['field']}"
+        for field in sorted(failed):
+            key = prefix + field
             self.failures[key] = self.failures.get(key, 0) + 1
             if self.failures[key] >= self.threshold:
-                alerts.append({"field": issue["field"], "message": "Payload drift threshold exceeded"})
-        if had_issues:
+                alerts.append({
+                    "field": field,
+                    "kind": "failing",
+                    "became": "",
+                    # "Payload drift threshold exceeded" named neither the field
+                    # nor the number, so it said only that something had been
+                    # counted somewhere.
+                    "message": f"{field} has failed {self.failures[key]} orders running",
+                })
+        recovered = [
+            key
+            for key in self.failures
+            if key.startswith(prefix) and key[len(prefix):] not in failed
+        ]
+        for key in recovered:
+            del self.failures[key]
+        if failed or recovered:
             self._save()
         return alerts
 

@@ -1374,6 +1374,7 @@ button.row:hover .row-action {
   color: var(--on-accent);
 }
 .drift-removed,
+.drift-failing,
 .drift-changed {
   border-color: var(--red-line);
   border-left-color: var(--red);
@@ -1381,6 +1382,7 @@ button.row:hover .row-action {
   color: var(--red);
 }
 .drift-removed .drift-kind,
+.drift-failing .drift-kind,
 .drift-changed .drift-kind {
   background: var(--red);
   color: var(--on-accent);
