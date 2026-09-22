@@ -484,7 +484,7 @@
   display: block;
   margin: 10px 0 5px;
   color: var(--text);
-  font: 500 27px var(--mono);
+  font: 500 var(--fs-display) var(--mono);
   letter-spacing: -0.06em;
 }
 .metric-icon {
@@ -592,7 +592,7 @@
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  font: 800 10px var(--mono);
+  font: 700 10px var(--mono);
 }
 .partner-avatar.orange,
 .table-avatar {
@@ -795,7 +795,7 @@ td:first-child {
   width: 25px;
   height: 25px;
   border-radius: 6px;
-  font: 800 8px var(--mono);
+  font: 700 8px var(--mono);
 }
 .result-pill {
   display: inline-flex;

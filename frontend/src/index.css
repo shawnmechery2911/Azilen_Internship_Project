@@ -1,12 +1,21 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700;800&family=Roboto+Mono:wght@400;500;700&display=swap");
 :root {
-  font-family: "Manrope", sans-serif;
+  /* One family in two cuts, so the whole POC reads as one thing. Field paths
+     and ids are set in the mono cut - Applicant.Names[0] needs unambiguous
+     characters, and a column of paths only lines up monospaced. Everything
+     else is the sans cut.
+
+     The local names after each webfont are for native dropdowns. A <select>
+     popup is drawn by the OS, which never sees a webfont, so without them it
+     lands on Courier New. */
+  --sans: "Roboto", "Segoe UI", system-ui, sans-serif;
+  --mono: "Roboto Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-family: var(--sans);
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --mono: "DM Mono", monospace;
 }
 * {
   box-sizing: border-box;
@@ -16,8 +25,12 @@ body {
   min-width: 320px;
   min-height: 100vh;
 }
+/* select was missing here, so every dropdown in the POC drew itself in the
+   browser's default form font instead of the app's. */
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 button {
