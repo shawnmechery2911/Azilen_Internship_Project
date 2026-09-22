@@ -15,6 +15,7 @@ function App() {
   const [screen, setScreen] = useState("Overview");
   const [apiUp, setApiUp] = useState(true);
   const [queueAts, setQueueAts] = useState<string | null>(null);
+  const [testAts, setTestAts] = useState<string | null>(null);
   const [ruleScope, setRuleScope] = useState<string | null>(null);
   const [openCount, setOpenCount] = useState(0);
   const [retired, setRetired] = useState(0);
@@ -49,6 +50,7 @@ function App() {
   const navigate = (next: string, ats?: string) => {
     setQueueAts(ats ?? null);
     if (next !== "Validation") setRuleScope(null);
+    if (next !== "Test") setTestAts(null);
     setScreen(next);
   };
   /** Approving is the moment the destination fields are known, so that is
@@ -66,9 +68,13 @@ function App() {
       <PartnersScreen
         onReview={openReview}
         onExceptions={(ats) => navigate("Exceptions", ats)}
+        onTest={(ats) => {
+          setTestAts(ats);
+          setScreen("Test");
+        }}
       />
     ) : screen === "Test" ? (
-      <TestOrderScreen onReview={openReview} />
+      <TestOrderScreen onReview={openReview} ats={testAts} />
     ) : screen === "Validation" ? (
       <RulesScreen scope={ruleScope} />
     ) : screen === "Review" && review ? (

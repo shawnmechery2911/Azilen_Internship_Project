@@ -82,6 +82,7 @@ function alter(
 
 export function ProcessPanel({
   onReview,
+  initialAts,
 }: {
   onReview: (
     ats: string,
@@ -89,6 +90,8 @@ export function ProcessPanel({
     version: number,
     retired?: number,
   ) => void;
+  /** Arriving from a partner's own row, that partner is the one to send to. */
+  initialAts?: string | null;
 }) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [ats, setAts] = useState("");
@@ -108,12 +111,15 @@ export function ProcessPanel({
         // only a partner with an approved mapping can be sent an order
         const usable = found.filter((item) => item.version !== null);
         setPartners(usable);
-        setAts((current) => current || usable[0]?.ats || "");
+        const wanted = usable.some((item) => item.ats === initialAts)
+          ? initialAts ?? ""
+          : "";
+        setAts((current) => wanted || current || usable[0]?.ats || "");
       })
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Could not load partners"),
       );
-  }, []);
+  }, [initialAts]);
 
   useEffect(() => {
     if (!ats) return;

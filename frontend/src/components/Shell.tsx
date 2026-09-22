@@ -68,8 +68,7 @@ export function Shell({
             <Zap size={17} fill="currentColor" />
           </div>
           <div>
-            <strong>PIPELINE</strong>
-            <span>mapping control</span>
+            <strong>ATS MAPPING TOOL</strong>
           </div>
         </div>
         <nav className="main-nav" aria-label="Primary navigation">

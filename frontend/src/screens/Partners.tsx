@@ -174,9 +174,11 @@ function PartnerDetail({
 export function PartnersScreen({
   onReview,
   onExceptions,
+  onTest,
 }: {
   onReview: (ats: string, payloadType: string, version: number) => void;
   onExceptions: (ats: string) => void;
+  onTest: (ats: string) => void;
 }) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [chosen, setChosen] = useState<Partner | null>(null);
@@ -238,30 +240,46 @@ export function PartnersScreen({
           <EmptyState label="No partners onboarded yet." />
         ) : (
           partners.map((partner) => (
-            <button
-              className="row"
+            /* Not a clickable row: the actions are buttons, so what each one
+               does is legible without hovering to find out. */
+            <div
+              className="partner-row"
               key={`${partner.ats}-${partner.payload_type}`}
-              onClick={() => setChosen(partner)}
             >
-              <span className="row-name">{partner.ats}</span>
-              <span className="row-desc">{partner.payload_type}</span>
-              {partner.pending_drafts > 0 ? (
+              <div className="partner-id">
+                <strong>{partner.ats}</strong>
+                <span>
+                  {partner.payload_type}
+                  {partner.version === null
+                    ? " · no approved mapping"
+                    : ` · mapping v${partner.version}`}
+                </span>
+              </div>
+              {partner.pending_drafts > 0 && (
                 <span className="row-badge">
                   {plural(partner.pending_drafts, "draft")}
                 </span>
-              ) : (
-                <span className="row-cell-empty" />
               )}
               <span className={`status status-${partner.status}`}>
                 {partner.status.replace("_", " ")}
               </span>
-              <code className="row-meta">
-                {partner.version === null ? "—" : `v${partner.version}`}
-              </code>
-              <em className="row-action">
-                Open <span aria-hidden="true">›</span>
-              </em>
-            </button>
+              <div className="partner-actions">
+                {partner.version !== null && (
+                  <button
+                    className="secondary-button"
+                    onClick={() => onTest(partner.ats)}
+                  >
+                    Send test order
+                  </button>
+                )}
+                <button
+                  className="primary-button"
+                  onClick={() => setChosen(partner)}
+                >
+                  Open
+                </button>
+              </div>
+            </div>
           ))
         )}
       </section>

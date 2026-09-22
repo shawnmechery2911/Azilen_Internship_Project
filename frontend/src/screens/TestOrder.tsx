@@ -115,6 +115,7 @@ function AddOrder({
 
 export function TestOrderScreen({
   onReview,
+  ats,
 }: {
   onReview: (
     ats: string,
@@ -122,6 +123,8 @@ export function TestOrderScreen({
     version: number,
     retired?: number,
   ) => void;
+  /** Set when arriving from a partner's own row. */
+  ats?: string | null;
 }) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [reload, setReload] = useState(0);
@@ -146,7 +149,7 @@ export function TestOrderScreen({
         </div>
       </section>
 
-      <ProcessPanel key={reload} onReview={onReview} />
+      <ProcessPanel key={reload} onReview={onReview} initialAts={ats} />
       {partners.length > 0 && (
         <AddOrder partners={partners} onAdded={() => setReload((n) => n + 1)} />
       )}
